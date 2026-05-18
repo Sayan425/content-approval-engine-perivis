@@ -1910,7 +1910,14 @@
       color: var(--text-dim);
       letter-spacing: 0.5px;
     }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  </script>
 </head>
 <body>
   <div class="grid-bg"></div>
@@ -3169,6 +3176,131 @@
       }
     }
 
+    const pdfDocs = {};
+
+    async function initPdfCarousel(rowNumber, url, isApproved = false) {
+      const prefix = isApproved ? 'approved-' : '';
+      const canvas = document.getElementById(`${prefix}pdf-canvas-${rowNumber}`);
+      const loader = document.getElementById(`${prefix}pdf-loader-${rowNumber}`);
+      
+      if (!canvas) return;
+
+      const key = `${prefix}${rowNumber}`;
+      pdfDocs[key] = {
+        doc: null,
+        currentPage: 1,
+        totalPages: 0,
+        url: url,
+        isApproved: isApproved,
+        rendering: false
+      };
+
+      try {
+        // Load the PDF document using CORS-friendly streaming
+        const loadingTask = pdfjsLib.getDocument({
+          url: url,
+          withCredentials: false
+        });
+        const pdf = await loadingTask.promise;
+        
+        pdfDocs[key].doc = pdf;
+        pdfDocs[key].totalPages = pdf.numPages;
+        
+        // Hide loader
+        if (loader) loader.style.display = 'none';
+        
+        // Render the first page
+        await renderPdfPage(rowNumber, 1, isApproved);
+        
+      } catch (err) {
+        console.error('PDF.js failed to load document:', err);
+        if (loader) {
+          loader.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" style="margin-bottom:6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span style="color: var(--red); font-size:10px; text-align:center; padding: 0 24px;">Unable to display PDF slide deck preview directly.</span>
+            <a href="${url}" target="_blank" class="btn btn-primary" style="margin-top: 8px; padding: 4px 8px; font-size: 9px; text-transform:uppercase; letter-spacing:0.5px;">Download Document</a>
+          `;
+        }
+      }
+    }
+
+    async function renderPdfPage(rowNumber, pageNum, isApproved = false) {
+      const prefix = isApproved ? 'approved-' : '';
+      const key = `${prefix}${rowNumber}`;
+      const state = pdfDocs[key];
+      if (!state || !state.doc || state.rendering) return;
+
+      state.rendering = true;
+      state.currentPage = pageNum;
+
+      try {
+        const page = await state.doc.getPage(pageNum);
+        const canvas = document.getElementById(`${prefix}pdf-canvas-${rowNumber}`);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        // Render scale designed for premium display high-fidelity detail
+        const viewport = page.getViewport({ scale: 1.5 });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: viewport
+        };
+        
+        await page.render(renderContext).promise;
+        canvas.style.opacity = '1';
+
+        // Update indicator
+        const pageIndicator = document.getElementById(`${prefix}pdf-page-indicator-${rowNumber}`);
+        if (pageIndicator) {
+          pageIndicator.innerText = `${pageNum} / ${state.totalPages} Pages`;
+        }
+
+        // Update navigation buttons status
+        const prevBtn = document.getElementById(`${prefix}pdf-prev-${rowNumber}`);
+        const nextBtn = document.getElementById(`${prefix}pdf-next-${rowNumber}`);
+        
+        if (prevBtn) {
+          if (pageNum > 1) {
+            prevBtn.style.opacity = '1';
+            prevBtn.style.pointerEvents = 'auto';
+          } else {
+            prevBtn.style.opacity = '0.15';
+            prevBtn.style.pointerEvents = 'none';
+          }
+        }
+        
+        if (nextBtn) {
+          if (pageNum < state.totalPages) {
+            nextBtn.style.opacity = '1';
+            nextBtn.style.pointerEvents = 'auto';
+          } else {
+            nextBtn.style.opacity = '0.15';
+            nextBtn.style.pointerEvents = 'none';
+          }
+        }
+
+      } catch (err) {
+        console.error('Error rendering PDF page:', err);
+      } finally {
+        state.rendering = false;
+      }
+    }
+
+    function changePdfPage(rowNumber, delta, isApproved = false) {
+      const prefix = isApproved ? 'approved-' : '';
+      const key = `${prefix}${rowNumber}`;
+      const state = pdfDocs[key];
+      if (!state || !state.doc) return;
+
+      const newPage = state.currentPage + delta;
+      if (newPage >= 1 && newPage <= state.totalPages) {
+        renderPdfPage(rowNumber, newPage, isApproved);
+      }
+    }
+
     function showFeedSkeleton() {
       const container = document.getElementById('feed-container');
       container.innerHTML = `
@@ -3239,6 +3371,22 @@
 
       postsData.forEach(post => {
         appendPostCard(post, container);
+        if (post['Media Link'] && post['Media Link'].trim() !== '') {
+          const mediaUrl = post['Media Link'].trim();
+          let isPdf = false;
+          try {
+            const urlObj = new URL(mediaUrl);
+            isPdf = urlObj.pathname.toLowerCase().endsWith('.pdf') || 
+                    urlObj.pathname.toLowerCase().includes('.pdf') ||
+                    mediaUrl.toLowerCase().includes('.pdf') ||
+                    mediaUrl.toLowerCase().includes('/pdf');
+          } catch(e) {
+            isPdf = mediaUrl.toLowerCase().includes('.pdf') || mediaUrl.toLowerCase().includes('/pdf');
+          }
+          if (isPdf) {
+            initPdfCarousel(post.row_number, mediaUrl, false);
+          }
+        }
       });
     }
 
@@ -3264,6 +3412,22 @@
 
       approvedPostsData.forEach(post => {
         appendApprovedPostCard(post, container);
+        if (post['Media Link'] && post['Media Link'].trim() !== '') {
+          const mediaUrl = post['Media Link'].trim();
+          let isPdf = false;
+          try {
+            const urlObj = new URL(mediaUrl);
+            isPdf = urlObj.pathname.toLowerCase().endsWith('.pdf') || 
+                    urlObj.pathname.toLowerCase().includes('.pdf') ||
+                    mediaUrl.toLowerCase().includes('.pdf') ||
+                    mediaUrl.toLowerCase().includes('/pdf');
+          } catch(e) {
+            isPdf = mediaUrl.toLowerCase().includes('.pdf') || mediaUrl.toLowerCase().includes('/pdf');
+          }
+          if (isPdf) {
+            initPdfCarousel(post.row_number, mediaUrl, true);
+          }
+        }
       });
     }
 
@@ -3419,20 +3583,39 @@
           }
           
           mediaBox = `
-            <!-- LinkedIn-Style High-Fidelity PDF Carousel Viewer -->
+            <!-- LinkedIn-Style High-Fidelity PDF Carousel Viewer (Page-by-Page Slider) -->
             <div class="post-media-box pdf-viewer-container" style="background: #0f131a; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin: 12px 0 4px 0;">
               <div class="pdf-viewer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border2);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px;">${fileName}</span>
+                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">${fileName}</span>
+                  <span class="pdf-page-indicator" id="pdf-page-indicator-${post.row_number}" style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); background: var(--surface3); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border);">Loading...</span>
                 </div>
                 <a href="${mediaUrl}" target="_blank" class="btn-open-pdf" style="display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--signal); text-decoration: none; border: 1px solid var(--signal-dim); padding: 4px 8px; border-radius: 4px; background: var(--signal-dim); transition: all 0.2s;">
                   <span>Open PDF</span>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                 </a>
               </div>
-              <div class="pdf-iframe-wrapper" style="position: relative; width: 100%; height: 420px; background: #12161f;">
-                <iframe src="${mediaUrl}#toolbar=0&navpanes=0&messages=0" style="width: 100%; height: 100%; border: none;" allow="autoplay"></iframe>
+              
+              <div class="pdf-canvas-container" style="position: relative; width: 100%; min-height: 380px; background: #0f131a; display: flex; align-items: center; justify-content: center; overflow: hidden; user-select: none;">
+                <!-- Loading spinner -->
+                <div class="pdf-loader" id="pdf-loader-${post.row_number}" style="position: absolute; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--text-dim); font-size: 11px; font-family: var(--mono);">
+                  <div class="loader-spinner" style="width: 24px; height: 24px; border: 2px solid var(--border2); border-top-color: var(--signal); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                  <span>Loading Slide Deck...</span>
+                </div>
+                
+                <!-- Left Navigation Arrow -->
+                <button class="pdf-nav-btn pdf-prev-btn" id="pdf-prev-${post.row_number}" onclick="changePdfPage(${post.row_number}, -1, false)" style="position: absolute; left: 12px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(18, 23, 31, 0.85); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.2; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                
+                <!-- Canvas for Page Rendering -->
+                <canvas class="pdf-render-canvas" id="pdf-canvas-${post.row_number}" style="max-width: 100%; max-height: 480px; display: block; object-fit: contain; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s;"></canvas>
+                
+                <!-- Right Navigation Arrow -->
+                <button class="pdf-nav-btn pdf-next-btn" id="pdf-next-${post.row_number}" onclick="changePdfPage(${post.row_number}, 1, false)" style="position: absolute; right: 12px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(18, 23, 31, 0.85); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.2; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
               </div>
             </div>
           `;
@@ -3568,20 +3751,39 @@
           }
           
           mediaBox = `
-            <!-- LinkedIn-Style High-Fidelity PDF Carousel Viewer -->
+            <!-- LinkedIn-Style High-Fidelity PDF Carousel Viewer (Page-by-Page Slider) -->
             <div class="post-media-box pdf-viewer-container" style="background: #0f131a; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin: 12px 0 4px 0;">
               <div class="pdf-viewer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border2);">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px;">${fileName}</span>
+                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">${fileName}</span>
+                  <span class="pdf-page-indicator" id="approved-pdf-page-indicator-${post.row_number}" style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); background: var(--surface3); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border);">Loading...</span>
                 </div>
                 <a href="${mediaUrl}" target="_blank" class="btn-open-pdf" style="display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--signal); text-decoration: none; border: 1px solid var(--signal-dim); padding: 4px 8px; border-radius: 4px; background: var(--signal-dim); transition: all 0.2s;">
                   <span>Open PDF</span>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                 </a>
               </div>
-              <div class="pdf-iframe-wrapper" style="position: relative; width: 100%; height: 420px; background: #12161f;">
-                <iframe src="${mediaUrl}#toolbar=0&navpanes=0&messages=0" style="width: 100%; height: 100%; border: none;" allow="autoplay"></iframe>
+              
+              <div class="pdf-canvas-container" style="position: relative; width: 100%; min-height: 380px; background: #0f131a; display: flex; align-items: center; justify-content: center; overflow: hidden; user-select: none;">
+                <!-- Loading spinner -->
+                <div class="pdf-loader" id="approved-pdf-loader-${post.row_number}" style="position: absolute; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--text-dim); font-size: 11px; font-family: var(--mono);">
+                  <div class="loader-spinner" style="width: 24px; height: 24px; border: 2px solid var(--border2); border-top-color: var(--signal); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                  <span>Loading Slide Deck...</span>
+                </div>
+                
+                <!-- Left Navigation Arrow -->
+                <button class="pdf-nav-btn pdf-prev-btn" id="approved-pdf-prev-${post.row_number}" onclick="changePdfPage(${post.row_number}, -1, true)" style="position: absolute; left: 12px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(18, 23, 31, 0.85); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.2; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                
+                <!-- Canvas for Page Rendering -->
+                <canvas class="pdf-render-canvas" id="approved-pdf-canvas-${post.row_number}" style="max-width: 100%; max-height: 480px; display: block; object-fit: contain; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s;"></canvas>
+                
+                <!-- Right Navigation Arrow -->
+                <button class="pdf-nav-btn pdf-next-btn" id="approved-pdf-next-${post.row_number}" onclick="changePdfPage(${post.row_number}, 1, true)" style="position: absolute; right: 12px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(18, 23, 31, 0.85); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.2; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
               </div>
             </div>
           `;
