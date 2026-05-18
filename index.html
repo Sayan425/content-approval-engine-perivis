@@ -3148,9 +3148,16 @@
         const data = await response.json();
         approvedPostsData = extractPostsArray(data);
         
+        // Sort approved posts in descending order of row number (latest first)
+        approvedPostsData.sort((a, b) => {
+          const rowA = parseInt(a.row_number) || 0;
+          const rowB = parseInt(b.row_number) || 0;
+          return rowB - rowA;
+        });
+        
         renderApprovedFeed();
         updateStatus('CONNECTED', 'var(--signal)');
-        addLogEntry(`Successfully synced ${approvedPostsData.length} approved posts.`);
+        addLogEntry(`Successfully synced ${approvedPostsData.length} approved posts (Sorted latest first).`);
         showToast(`Pulled ${approvedPostsData.length} approved posts`, 'success');
       } catch (err) {
         console.error('Connection failed for approved archive', err);
@@ -3388,17 +3395,50 @@
       // Optional Media Box
       let mediaBox = '';
       if (post['Media Link'] && post['Media Link'].trim() !== '') {
-        mediaBox = `
-          <!-- Full Width Media Image Preview -->
-          <div class="post-media-box">
-            <img class="post-media-image" id="media-img-${post.row_number}" src="${post['Media Link'].trim()}" alt="Feed Visual Asset" onerror="handleImageError(${post.row_number})">
-            <div id="media-fallback-${post.row_number}" class="media-fallback" style="display:none;">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--red);"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-              <div class="media-fallback-text">Unable to load direct visual asset image. Verify link availability.</div>
-              <a href="${post['Media Link']}" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:10px;">Open Image Link In New Tab</a>
+        const mediaUrl = post['Media Link'].trim();
+        const isPdf = mediaUrl.toLowerCase().endsWith('.pdf') || mediaUrl.toLowerCase().includes('.pdf') || mediaUrl.toLowerCase().includes('/pdf');
+        
+        if (isPdf) {
+          let fileName = 'Document.pdf';
+          try {
+            const urlObj = new URL(mediaUrl);
+            const pathParts = urlObj.pathname.split('/');
+            fileName = decodeURIComponent(pathParts[pathParts.length - 1] || 'Document.pdf');
+          } catch(e) {
+            fileName = 'Document.pdf';
+          }
+          
+          mediaBox = `
+            <!-- LinkedIn-Style High-Fidelity PDF Carousel Viewer -->
+            <div class="post-media-box pdf-viewer-container" style="background: #0f131a; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin: 12px 0 4px 0;">
+              <div class="pdf-viewer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border2);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px;">${fileName}</span>
+                </div>
+                <a href="${mediaUrl}" target="_blank" class="btn-open-pdf" style="display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--signal); text-decoration: none; border: 1px solid var(--signal-dim); padding: 4px 8px; border-radius: 4px; background: var(--signal-dim); transition: all 0.2s;">
+                  <span>Open PDF</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                </a>
+              </div>
+              <div class="pdf-iframe-wrapper" style="position: relative; width: 100%; height: 420px; background: #12161f;">
+                <iframe src="${mediaUrl}#toolbar=0&navpanes=0&messages=0" style="width: 100%; height: 100%; border: none;" allow="autoplay"></iframe>
+              </div>
             </div>
-          </div>
-        `;
+          `;
+        } else {
+          mediaBox = `
+            <!-- Full Width Media Image Preview -->
+            <div class="post-media-box">
+              <img class="post-media-image" id="media-img-${post.row_number}" src="${mediaUrl}" alt="Feed Visual Asset" onerror="handleImageError(${post.row_number})">
+              <div id="media-fallback-${post.row_number}" class="media-fallback" style="display:none;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--red);"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <div class="media-fallback-text">Unable to load direct visual asset image. Verify link availability.</div>
+                <a href="${mediaUrl}" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:10px;">Open Image Link In New Tab</a>
+              </div>
+            </div>
+          `;
+        }
       }
 
       // LinkedIn-style Truncation logic
@@ -3494,17 +3534,50 @@
       // Optional Media Box
       let mediaBox = '';
       if (post['Media Link'] && post['Media Link'].trim() !== '') {
-        mediaBox = `
-          <!-- Full Width Media Image Preview -->
-          <div class="post-media-box">
-            <img class="post-media-image" id="approved-media-img-${post.row_number}" src="${post['Media Link'].trim()}" alt="Feed Visual Asset" onerror="handleApprovedImageError(${post.row_number})">
-            <div id="approved-media-fallback-${post.row_number}" class="media-fallback" style="display:none;">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--red);"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-              <div class="media-fallback-text">Unable to load direct visual asset image. Verify link availability.</div>
-              <a href="${post['Media Link']}" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:10px;">Open Image Link In New Tab</a>
+        const mediaUrl = post['Media Link'].trim();
+        const isPdf = mediaUrl.toLowerCase().endsWith('.pdf') || mediaUrl.toLowerCase().includes('.pdf') || mediaUrl.toLowerCase().includes('/pdf');
+        
+        if (isPdf) {
+          let fileName = 'Document.pdf';
+          try {
+            const urlObj = new URL(mediaUrl);
+            const pathParts = urlObj.pathname.split('/');
+            fileName = decodeURIComponent(pathParts[pathParts.length - 1] || 'Document.pdf');
+          } catch(e) {
+            fileName = 'Document.pdf';
+          }
+          
+          mediaBox = `
+            <!-- LinkedIn-Style High-Fidelity PDF Carousel Viewer -->
+            <div class="post-media-box pdf-viewer-container" style="background: #0f131a; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin: 12px 0 4px 0;">
+              <div class="pdf-viewer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border2);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px;">${fileName}</span>
+                </div>
+                <a href="${mediaUrl}" target="_blank" class="btn-open-pdf" style="display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--signal); text-decoration: none; border: 1px solid var(--signal-dim); padding: 4px 8px; border-radius: 4px; background: var(--signal-dim); transition: all 0.2s;">
+                  <span>Open PDF</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                </a>
+              </div>
+              <div class="pdf-iframe-wrapper" style="position: relative; width: 100%; height: 420px; background: #12161f;">
+                <iframe src="${mediaUrl}#toolbar=0&navpanes=0&messages=0" style="width: 100%; height: 100%; border: none;" allow="autoplay"></iframe>
+              </div>
             </div>
-          </div>
-        `;
+          `;
+        } else {
+          mediaBox = `
+            <!-- Full Width Media Image Preview -->
+            <div class="post-media-box">
+              <img class="post-media-image" id="approved-media-img-${post.row_number}" src="${mediaUrl}" alt="Feed Visual Asset" onerror="handleApprovedImageError(${post.row_number})">
+              <div id="approved-media-fallback-${post.row_number}" class="media-fallback" style="display:none;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--red);"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <div class="media-fallback-text">Unable to load direct visual asset image. Verify link availability.</div>
+                <a href="${mediaUrl}" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:10px;">Open Image Link In New Tab</a>
+              </div>
+            </div>
+          `;
+        }
       }
 
       // LinkedIn-style Truncation logic
@@ -3552,9 +3625,18 @@
       container.appendChild(card);
     }
 
+    function handleImageError(rowNumber) {
+      const img = document.getElementById(`media-img-${rowNumber}`);
+      if (img) img.style.display = 'none';
+      const fallback = document.getElementById(`media-fallback-${rowNumber}`);
+      if (fallback) fallback.style.display = 'flex';
+    }
+
     function handleApprovedImageError(rowNumber) {
-      document.getElementById(`approved-media-img-${rowNumber}`).style.display = 'none';
-      document.getElementById(`approved-media-fallback-${rowNumber}`).style.display = 'flex';
+      const img = document.getElementById(`approved-media-img-${rowNumber}`);
+      if (img) img.style.display = 'none';
+      const fallback = document.getElementById(`approved-media-fallback-${rowNumber}`);
+      if (fallback) fallback.style.display = 'flex';
     }
 
     // Submit and update approval state to sheet backend webhook
