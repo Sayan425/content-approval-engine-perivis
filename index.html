@@ -3396,7 +3396,17 @@
       let mediaBox = '';
       if (post['Media Link'] && post['Media Link'].trim() !== '') {
         const mediaUrl = post['Media Link'].trim();
-        const isPdf = mediaUrl.toLowerCase().endsWith('.pdf') || mediaUrl.toLowerCase().includes('.pdf') || mediaUrl.toLowerCase().includes('/pdf');
+        
+        let isPdf = false;
+        try {
+          const urlObj = new URL(mediaUrl);
+          isPdf = urlObj.pathname.toLowerCase().endsWith('.pdf') || 
+                  urlObj.pathname.toLowerCase().includes('.pdf') ||
+                  mediaUrl.toLowerCase().includes('.pdf') ||
+                  mediaUrl.toLowerCase().includes('/pdf');
+        } catch(e) {
+          isPdf = mediaUrl.toLowerCase().includes('.pdf') || mediaUrl.toLowerCase().includes('/pdf');
+        }
         
         if (isPdf) {
           let fileName = 'Document.pdf';
@@ -3535,7 +3545,17 @@
       let mediaBox = '';
       if (post['Media Link'] && post['Media Link'].trim() !== '') {
         const mediaUrl = post['Media Link'].trim();
-        const isPdf = mediaUrl.toLowerCase().endsWith('.pdf') || mediaUrl.toLowerCase().includes('.pdf') || mediaUrl.toLowerCase().includes('/pdf');
+        
+        let isPdf = false;
+        try {
+          const urlObj = new URL(mediaUrl);
+          isPdf = urlObj.pathname.toLowerCase().endsWith('.pdf') || 
+                  urlObj.pathname.toLowerCase().includes('.pdf') ||
+                  mediaUrl.toLowerCase().includes('.pdf') ||
+                  mediaUrl.toLowerCase().includes('/pdf');
+        } catch(e) {
+          isPdf = mediaUrl.toLowerCase().includes('.pdf') || mediaUrl.toLowerCase().includes('/pdf');
+        }
         
         if (isPdf) {
           let fileName = 'Document.pdf';
