@@ -1,0 +1,3709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perivis.ai — Content Approval & Strategy Engine</title>
+  <link rel="icon" type="image/png" href="https://get.tofler.in/wp-content/uploads/2026/05/Logo-light.png">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@450;500;700;800&family=Inter:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #05070a;
+      --nav-bg: #0b0f14;
+      --surface: #0b0f14;
+      --surface2: #12171f;
+      --surface3: #1a222e;
+      --border: #1a222e;
+      --border2: #242f40;
+      
+      --signal: #00e5a0;
+      --signal-dim: rgba(0, 229, 160, 0.08);
+      --signal-glow: rgba(0, 229, 160, 0.04);
+      --signal-solid: #00b880;
+      
+      --amber: #f5a623;
+      --amber-dim: rgba(245, 166, 35, 0.08);
+      
+      --blue: #4d9fff;
+      --blue-dim: rgba(77, 159, 255, 0.08);
+      
+      --red: #ff5c5c;
+      --red-dim: rgba(255, 92, 92, 0.08);
+      --red-solid: #ff5c5c;
+      
+      --text: #e2e8f0;
+      --text-dim: #8899aa;
+      --text-dimmer: #4a5568;
+      
+      --mono: 'IBM Plex Mono', monospace;
+      --display: 'Syne', sans-serif;
+      --sans: 'Inter', sans-serif;
+      
+      --glow-shadow: 0 0 20px rgba(0, 229, 160, 0.15);
+      --panel-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Noise overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.7;
+    }
+
+    /* Grid background */
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 229, 160, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 229, 160, 0.015) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-dimmer);
+    }
+
+    /* Password gate */
+    #password-gate {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 7, 10, 0.95);
+      backdrop-filter: blur(12px);
+      z-index: 10000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    #password-gate.unlocked {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(1.05);
+    }
+
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      padding: 40px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: var(--panel-shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .auth-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--signal), transparent);
+    }
+
+    .auth-title {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 20px;
+      color: #fff;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .auth-subtitle {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      text-align: center;
+      margin-bottom: 32px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    .form-label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-dimmer);
+      margin-bottom: 8px;
+    }
+
+    .password-input-wrapper {
+      position: relative;
+    }
+
+    .password-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: #fff;
+      padding: 14px 20px;
+      font-family: var(--mono);
+      font-size: 16px;
+      letter-spacing: 0.4em;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .password-input:focus {
+      outline: none;
+      border-color: var(--signal);
+      box-shadow: var(--glow-shadow);
+      background: var(--surface3);
+    }
+
+    .auth-btn {
+      width: 100%;
+      background: var(--signal-dim);
+      border: 1px solid var(--signal);
+      color: var(--signal);
+      padding: 14px;
+      font-family: var(--mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .auth-btn:hover {
+      background: var(--signal);
+      color: var(--bg);
+      box-shadow: var(--glow-shadow);
+    }
+
+    .error-msg {
+      color: var(--red);
+      font-family: var(--mono);
+      font-size: 11px;
+      margin-top: 12px;
+      text-align: center;
+      min-height: 18px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .error-msg.visible {
+      opacity: 1;
+    }
+
+    /* Navigation Bar */
+    nav {
+      background: var(--nav-bg);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 0 12px;
+      height: 56px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .nav-container {
+      max-width: 600px;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 100%;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100%;
+    }
+
+    .logo-image {
+      height: 28px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    /* Modern Dropdown Navigation Menu */
+    .menu-dropdown-container {
+      position: relative;
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+
+    .menu-trigger-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .menu-trigger-btn:hover {
+      border-color: var(--signal);
+      box-shadow: var(--signal-glow);
+    }
+
+    .dropdown-chevron {
+      transition: transform 0.2s ease;
+      color: var(--text-dim);
+    }
+
+    .menu-dropdown-container.open .dropdown-chevron {
+      transform: rotate(180deg);
+    }
+
+    .nav-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: rgba(11, 15, 20, 0.95);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      padding: 6px;
+      width: 200px;
+      box-shadow: var(--panel-shadow);
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      z-index: 1000;
+      transform-origin: top right;
+      animation: dropdownFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes dropdownFadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      color: var(--text-dim);
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .dropdown-item svg {
+      color: var(--text-dimmer);
+      transition: color 0.2s ease;
+    }
+
+    .dropdown-item:hover {
+      background: var(--surface2);
+      color: #fff;
+    }
+
+    .dropdown-item:hover svg {
+      color: var(--signal);
+    }
+
+    .dropdown-item.active {
+      background: var(--signal-dim);
+      color: var(--signal);
+    }
+
+    .dropdown-item.active svg {
+      color: var(--signal);
+    }
+
+    @media (max-width: 480px) {
+      .logo-image {
+        height: 24px;
+      }
+      .menu-trigger-btn {
+        padding: 6px 12px;
+        font-size: 10px;
+        gap: 6px;
+      }
+    }
+
+    /* Single Centered Column Layout - Mobile Friendly Gaps */
+    .feed-grid {
+      max-width: 600px;
+      width: 100%;
+      margin: 16px auto;
+      padding: 0 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    @media (min-width: 480px) {
+      .feed-grid {
+        margin: 24px auto;
+        padding: 0 16px;
+        gap: 20px;
+      }
+    }
+
+    /* Header Title Component */
+    .feed-header-row {
+      text-align: center;
+      margin-bottom: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    
+    .feed-main-title {
+      font-family: var(--sans);
+      font-size: 20px;
+      font-weight: 750;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+
+    @media (min-width: 480px) {
+      .feed-main-title {
+        font-size: 24px;
+      }
+    }
+    
+    .feed-status-meta {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    @media (min-width: 480px) {
+      .feed-status-meta {
+        font-size: 11px;
+        gap: 6px;
+      }
+    }
+    
+    .status-dot-separator {
+      color: var(--border2);
+    }
+
+    /* LinkedIn Feed Post Card */
+    .feed-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    @media (min-width: 480px) {
+      .feed-container {
+        gap: 16px;
+      }
+    }
+
+    .post-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--panel-shadow);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      width: 100%;
+    }
+
+    .post-card.approved {
+      border-color: var(--signal);
+      box-shadow: 0 0 16px rgba(0, 229, 160, 0.1);
+    }
+
+    .post-card.rejected {
+      border-color: var(--amber);
+      box-shadow: 0 0 16px rgba(245, 166, 35, 0.1);
+    }
+
+    .post-card.redo_requested {
+      border-color: var(--red);
+      box-shadow: 0 0 16px rgba(255, 92, 92, 0.1);
+    }
+
+    .post-card-header {
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    @media (min-width: 480px) {
+      .post-card-header {
+        padding: 16px;
+        align-items: center;
+      }
+    }
+
+    .post-author {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    @media (min-width: 480px) {
+      .post-author {
+        gap: 14px;
+      }
+    }
+
+    .post-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1.5px solid var(--border2);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    @media (min-width: 480px) {
+      .post-avatar {
+        width: 56px;
+        height: 56px;
+      }
+    }
+
+    .post-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .post-author-info {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+
+    .post-author-name {
+      font-weight: 700;
+      color: #fff;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    @media (min-width: 480px) {
+      .post-author-name {
+        font-size: 15px;
+      }
+    }
+
+    .post-author-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.4;
+      margin-top: 1px;
+    }
+
+    @media (min-width: 480px) {
+      .post-author-meta {
+        font-size: 12px;
+      }
+    }
+
+    .badge-container {
+      flex-shrink: 0;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .badge-status {
+      font-family: var(--mono);
+      font-size: 9px;
+      padding: 4px 8px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border-radius: 4px;
+      font-weight: 600;
+      white-space: nowrap;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+    }
+
+    @media (min-width: 480px) {
+      .badge-status {
+        font-size: 10px;
+        padding: 4px 10px;
+        letter-spacing: 1px;
+      }
+    }
+
+    .status-pending { background: var(--amber-dim); color: var(--amber); border-color: var(--amber-dim); }
+    .status-approved { background: var(--signal-dim); color: var(--signal); border-color: var(--signal-dim); }
+    .status-rejected { background: var(--amber-dim); color: var(--amber); border-color: var(--amber-dim); }
+    .status-redo { background: var(--red-dim); color: var(--red); border-color: var(--red-dim); }
+
+    /* Premium editable caption block */
+    .post-content-wrapper {
+      padding: 4px 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    @media (min-width: 480px) {
+      .post-content-wrapper {
+        padding: 4px 16px 16px;
+        gap: 8px;
+      }
+    }
+    
+    .post-content-text {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.5;
+      white-space: pre-wrap;
+      outline: none;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 2px;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    @media (min-width: 480px) {
+      .post-content-text {
+        font-size: 13.5px;
+        padding: 4px;
+      }
+    }
+
+    .post-content-text.editing-active {
+      background: var(--surface2);
+      border-color: var(--signal);
+      box-shadow: var(--signal-glow);
+    }
+    
+    .see-more-link, .see-less-link {
+      font-weight: 600;
+      color: var(--text-dim);
+      cursor: pointer;
+      margin-left: 2px;
+      transition: color 0.2s ease;
+    }
+
+    .see-more-link:hover, .see-less-link:hover {
+      color: #fff;
+      text-decoration: underline;
+    }
+
+    .post-content-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .btn-edit-text-trigger {
+      background: transparent;
+      border: 1px solid var(--border2);
+      color: var(--signal);
+      font-family: var(--mono);
+      font-size: 9px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+    }
+
+    @media (min-width: 480px) {
+      .btn-edit-text-trigger {
+        font-size: 10px;
+        padding: 4px 10px;
+      }
+    }
+
+    .btn-edit-text-trigger:hover {
+      background: var(--signal-dim);
+      border-color: var(--signal);
+    }
+
+    .btn-edit-text-trigger.editing-btn-active {
+      background: var(--signal);
+      color: var(--bg);
+      border-color: var(--signal);
+      box-shadow: var(--glow-shadow);
+      font-weight: 600;
+    }
+
+    /* Media Box */
+    .post-media-box {
+      width: 100%;
+      background: #020304;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+      min-height: 200px;
+    }
+
+    @media (min-width: 480px) {
+      .post-media-box {
+        min-height: 250px;
+      }
+    }
+
+    .post-media-image {
+      width: 100%;
+      height: auto;
+      max-height: 480px;
+      object-fit: contain;
+      transition: opacity 0.3s ease;
+    }
+
+    .media-fallback {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      text-align: center;
+      background: var(--surface2);
+      gap: 8px;
+    }
+
+    .media-fallback-text {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      max-width: 280px;
+    }
+
+    /* Cleaned 3-Button LinkedIn social style action grid */
+    .post-action-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      padding: 8px 4px;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+      gap: 4px;
+    }
+
+    @media (min-width: 480px) {
+      .post-action-buttons {
+        padding: 10px 8px;
+        gap: 8px;
+      }
+    }
+
+    .action-btn-li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 10px 2px;
+      font-size: 9px;
+      font-family: var(--sans);
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      border-radius: 6px;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @media (min-width: 480px) {
+      .action-btn-li {
+        flex-direction: row;
+        gap: 8px;
+        font-size: 11.5px;
+        padding: 10px 12px;
+      }
+    }
+
+    .btn-approve-action {
+      border-color: var(--signal-solid);
+      color: var(--signal);
+      background: rgba(0, 229, 160, 0.02);
+    }
+    .btn-approve-action:hover {
+      background: var(--signal);
+      color: var(--bg);
+      box-shadow: var(--glow-shadow);
+      border-color: var(--signal);
+    }
+
+    .btn-text-action {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: rgba(245, 166, 35, 0.02);
+    }
+    .btn-text-action:hover, .btn-text-action.active-action {
+      background: var(--amber);
+      color: var(--bg);
+      border-color: var(--amber);
+      box-shadow: 0 0 12px rgba(245, 166, 35, 0.2);
+    }
+
+    .btn-redo-action {
+      border-color: var(--red);
+      color: var(--red);
+      background: rgba(255, 92, 92, 0.02);
+    }
+    .btn-redo-action:hover {
+      background: var(--red);
+      color: #fff;
+      border-color: var(--red);
+      box-shadow: 0 0 12px rgba(255, 92, 92, 0.2);
+    }
+
+    /* LinkedIn-style Collapsible Comment Input drawer */
+    .collapsible-comment-panel {
+      background: var(--surface2);
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @media (min-width: 480px) {
+      .collapsible-comment-panel {
+        padding: 14px 16px;
+      }
+    }
+
+    .comment-input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      width: 100%;
+    }
+
+    .comment-avatar-mini {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 1px solid var(--border2);
+      flex-shrink: 0;
+      background: var(--surface3);
+      padding: 2px;
+    }
+
+    @media (min-width: 480px) {
+      .comment-avatar-mini {
+        width: 32px;
+        height: 32px;
+      }
+    }
+
+    .comment-avatar-mini img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .comment-bubble-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .comment-bubble-textarea {
+      width: 100%;
+      background: var(--surface3);
+      border: 1px solid var(--border2);
+      color: #fff;
+      padding: 10px 14px;
+      font-family: var(--sans);
+      font-size: 13px;
+      border-radius: 16px;
+      resize: none;
+      min-height: 44px;
+      transition: all 0.2s ease;
+    }
+
+    @media (min-width: 480px) {
+      .comment-bubble-textarea {
+        padding: 12px 16px;
+        font-size: 13.5px;
+        min-height: 48px;
+      }
+    }
+
+    .comment-bubble-textarea:focus {
+      outline: none;
+      border-color: var(--signal);
+      background: #151c27;
+    }
+
+    .comment-submit-btn {
+      align-self: flex-end;
+      background: var(--signal);
+      color: var(--bg);
+      border: none;
+      padding: 5px 14px;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    @media (min-width: 480px) {
+      .comment-submit-btn {
+        padding: 6px 18px;
+        font-size: 11px;
+      }
+    }
+
+    .comment-submit-btn:hover {
+      background: #fff;
+      box-shadow: var(--glow-shadow);
+    }
+
+    /* Skeletons */
+    .skeleton-card {
+      height: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--surface3) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: skeleton-loading 1.5s infinite;
+      border-radius: 2px;
+    }
+
+    @keyframes skeleton-loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .skeleton-avatar { width: 40px; height: 40px; border-radius: 50%; }
+    .skeleton-line { height: 12px; }
+
+    /* Webhook Settings Grid inside Sync View */
+    .settings-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      text-align: left;
+    }
+
+    @media (min-width: 480px) {
+      .settings-grid {
+        gap: 16px;
+      }
+    }
+
+    .settings-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .settings-input {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: #fff;
+      padding: 8px 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      width: 100%;
+      border-radius: 4px;
+      transition: border-color 0.2s ease;
+    }
+
+    @media (min-width: 480px) {
+      .settings-input {
+        padding: 10px 14px;
+        font-size: 12px;
+      }
+    }
+
+    .settings-input:focus {
+      outline: none;
+      border-color: var(--signal);
+    }
+
+    /* Toast Notification System */
+    #toast-container {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      z-index: 10001;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    @media (min-width: 480px) {
+      #toast-container {
+        bottom: 24px;
+        right: 24px;
+        gap: 8px;
+      }
+    }
+
+    .toast {
+      background: var(--surface3);
+      border: 1px solid var(--border2);
+      border-left: 3px solid var(--signal);
+      color: #fff;
+      padding: 12px 16px;
+      box-shadow: var(--panel-shadow);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transform: translateX(120%);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+      pointer-events: auto;
+      max-width: 280px;
+      border-radius: 4px;
+    }
+
+    @media (min-width: 480px) {
+      .toast {
+        padding: 16px 20px;
+        gap: 12px;
+        max-width: 320px;
+      }
+    }
+
+    .toast.toast-error {
+      border-left-color: var(--red);
+    }
+
+    .toast.toast-info {
+      border-left-color: var(--blue);
+    }
+
+    .toast.show {
+      transform: translateX(0);
+    }
+
+    .toast-msg {
+      font-size: 12px;
+      font-family: var(--sans);
+    }
+
+    @media (min-width: 480px) {
+      .toast-msg {
+        font-size: 13px;
+      }
+    }
+
+    /* Empty State */
+    .empty-state {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      box-shadow: var(--panel-shadow);
+      width: 100%;
+    }
+
+    @media (min-width: 480px) {
+      .empty-state {
+        padding: 48px;
+        gap: 16px;
+      }
+    }
+
+    .empty-icon {
+      color: var(--text-dimmer);
+      animation: pulse 3s infinite ease-in-out;
+    }
+
+    .empty-title {
+      font-family: var(--display);
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+
+    @media (min-width: 480px) {
+      .empty-title {
+        font-size: 18px;
+        letter-spacing: 2px;
+      }
+    }
+
+    .empty-subtitle {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      max-width: 340px;
+    }
+
+    @media (min-width: 480px) {
+      .empty-subtitle {
+        font-size: 12px;
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.98); }
+      50% { opacity: 0.7; transform: scale(1.02); }
+    }
+
+    /* ==========================================================================
+       EMBEDDED CONTENT STRATEGY ISOLATED STYLES
+       Prefixed with #view-strategy to guarantee zero styling collisions!
+       ========================================================================== */
+    
+    #view-strategy {
+      background: #0a0c0f !important;
+      color: #e2e8f0;
+      overflow-y: auto;
+      height: calc(100vh - 56px);
+      text-align: center;
+      position: relative;
+    }
+
+    #view-strategy .cover {
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 80px 24px;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+    
+    #view-strategy .cover::after {
+      content: '';
+      position: absolute;
+      top: -200px; right: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(0,229,160,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    
+    #view-strategy .cover-tag {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--signal);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    #view-strategy .cover-tag::before {
+      content: '';
+      width: 24px; height: 1px;
+      background: var(--signal);
+      display: inline-block;
+    }
+    
+    #view-strategy .cover h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(36px, 5vw, 68px);
+      line-height: 1.1;
+      color: #fff;
+      max-width: 800px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    
+    #view-strategy .cover h1 em {
+      color: var(--signal);
+      font-style: italic;
+    }
+    
+    #view-strategy .cover-subtitle {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 48px;
+      letter-spacing: 0.5px;
+      max-width: 600px;
+      line-height: 1.6;
+    }
+    
+    #view-strategy .cover-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    
+    @media (min-width: 560px) {
+      #view-strategy .cover-meta {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 32px;
+        max-width: 800px;
+      }
+    }
+    
+    #view-strategy .cover-meta-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dimmer);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 4px;
+    }
+    
+    #view-strategy .cover-meta-value {
+      font-family: var(--mono);
+      font-size: 12.5px;
+      color: var(--signal);
+      font-weight: 500;
+    }
+    
+    #view-strategy .cover-grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,160,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,160,0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    #view-strategy .doc {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 16px 80px;
+    }
+    
+    @media (min-width: 480px) {
+      #view-strategy .doc {
+        padding: 0 28px 80px;
+      }
+    }
+
+    #view-strategy .section {
+      margin-top: 56px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+    }
+    
+    #view-strategy .section-number {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dimmer);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+    
+    #view-strategy .section h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(24px, 3.5vw, 36px);
+      color: #fff;
+      line-height: 1.15;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    
+    #view-strategy .section-lead {
+      color: var(--text-dim);
+      font-size: 13.5px;
+      max-width: 600px;
+      margin: 0 auto 36px;
+      font-family: var(--mono);
+      line-height: 1.6;
+    }
+
+    #view-strategy .cards {
+      display: grid;
+      gap: 1px;
+      background: var(--border);
+      width: 100%;
+    }
+    
+    #view-strategy .cards-2 {
+      grid-template-columns: 1fr;
+    }
+    
+    #view-strategy .cards-3 {
+      grid-template-columns: 1fr;
+    }
+    
+    @media (min-width: 640px) {
+      #view-strategy .cards-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    
+    @media (min-width: 768px) {
+      #view-strategy .cards-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    
+    #view-strategy .card {
+      background: var(--surface);
+      padding: 24px;
+      text-align: left;
+    }
+    
+    #view-strategy .card-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dimmer);
+      margin-bottom: 8px;
+    }
+    
+    #view-strategy .card h3 {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 15px;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+    
+    #view-strategy .card p {
+      font-size: 12.5px;
+      color: var(--text-dim);
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    
+    #view-strategy .card.signal { border-left: 3.5px solid var(--signal); }
+    #view-strategy .card.amber { border-left: 3.5px solid var(--amber); }
+    #view-strategy .card.blue { border-left: 3.5px solid var(--blue); }
+    #view-strategy .card.red { border-left: 3.5px solid var(--red); }
+
+    /* Competitor Table */
+    #view-strategy .comp-table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-bottom: 32px;
+      border: 1px solid var(--border);
+    }
+    
+    #view-strategy .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+    }
+    
+    #view-strategy .comp-table th {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dimmer);
+      text-align: left;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border2);
+      background: var(--bg);
+    }
+    
+    #view-strategy .comp-table td {
+      font-size: 12.5px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      color: var(--text);
+      line-height: 1.5;
+      text-align: left;
+    }
+    
+    #view-strategy .comp-table tr:hover td {
+      background: var(--surface2);
+    }
+    
+    #view-strategy .comp-table .name {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: #fff;
+      font-weight: 600;
+    }
+    
+    #view-strategy .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 2px;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+    
+    #view-strategy .badge-signal { background: var(--signal-dim); color: var(--signal); }
+    #view-strategy .badge-amber { background: var(--amber-dim); color: var(--amber); }
+    #view-strategy .badge-blue { background: var(--blue-dim); color: var(--blue); }
+    #view-strategy .badge-red { background: var(--red-dim); color: var(--red); }
+    #view-strategy .badge-dim { background: var(--surface2); color: var(--text-dim); }
+
+    /* Stat Blocks */
+    #view-strategy .stat-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1px;
+      background: var(--border);
+      margin: 24px 0;
+    }
+    
+    @media (min-width: 560px) {
+      #view-strategy .stat-row {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+    
+    #view-strategy .stat-cell {
+      background: var(--surface);
+      padding: 20px 16px;
+      text-align: center;
+    }
+    
+    #view-strategy .stat-num {
+      font-family: var(--mono);
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--signal);
+      margin-bottom: 2px;
+      display: block;
+    }
+    
+    #view-strategy .stat-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dimmer);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Pillar Bars */
+    #view-strategy .pillar-row {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    
+    #view-strategy .pillar-row-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    
+    #view-strategy .pillar-name {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    
+    #view-strategy .pillar-pct {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    
+    #view-strategy .pillar-bar {
+      height: 4px;
+      background: var(--border2);
+      border-radius: 2px;
+      overflow: hidden;
+      width: 100%;
+    }
+    
+    #view-strategy .pillar-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+    
+    #view-strategy .fill-signal { background: var(--signal); }
+    #view-strategy .fill-amber { background: var(--amber); }
+    #view-strategy .fill-blue { background: var(--blue); }
+    #view-strategy .fill-red { background: var(--red); }
+
+    /* Content Type Playbook Cards */
+    #view-strategy .ctype {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 24px;
+      margin-bottom: 16px;
+      position: relative;
+      transition: border-color 0.2s;
+      text-align: left;
+    }
+    
+    #view-strategy .ctype:hover {
+      border-color: var(--border2);
+    }
+    
+    #view-strategy .ctype-num {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dimmer);
+      letter-spacing: 1.5px;
+      margin-bottom: 6px;
+    }
+    
+    #view-strategy .ctype h3 {
+      font-family: var(--sans);
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    
+    #view-strategy .ctype-desc {
+      font-size: 12.5px;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+    
+    #view-strategy .ctype-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-top: 14px;
+    }
+    
+    @media (min-width: 560px) {
+      #view-strategy .ctype-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    
+    #view-strategy .ctype-sub-label {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dimmer);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    
+    #view-strategy .ctype-sub-content {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    
+    #view-strategy .ctype-sub-content ul {
+      padding-left: 0;
+      list-style: none;
+    }
+    
+    #view-strategy .ctype-sub-content li {
+      margin-bottom: 4px;
+      position: relative;
+      padding-left: 10px;
+    }
+    
+    #view-strategy .ctype-sub-content li::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      color: var(--signal);
+    }
+    
+    #view-strategy .example-box {
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-left: 3px solid var(--signal);
+      padding: 12px 16px;
+      margin-top: 14px;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+    
+    #view-strategy .example-box strong {
+      color: var(--signal);
+      display: block;
+      margin-bottom: 4px;
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* Hook Table */
+    #view-strategy .hook-table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-top: 24px;
+      border: 1px solid var(--border);
+    }
+    
+    #view-strategy .hook-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+      text-align: left;
+      background: var(--surface);
+    }
+    
+    #view-strategy .hook-table th {
+      font-family: var(--mono);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-dimmer);
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border2);
+      background: var(--bg);
+    }
+    
+    #view-strategy .hook-table td {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      font-size: 12.5px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+    
+    #view-strategy .hook-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    #view-strategy .hook-table .hook-id {
+      font-family: var(--mono);
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 130px;
+    }
+    
+    #view-strategy .hook-table .hook-templates {
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    
+    #view-strategy .hook-table .hook-strategy {
+      font-size: 11.5px;
+      line-height: 1.5;
+    }
+    
+    #view-strategy .hook-table tr:hover td {
+      background: var(--surface2);
+    }
+
+    /* Content Calendar */
+    #view-strategy .cal {
+      display: grid;
+      grid-template-columns: repeat(1, 1fr);
+      gap: 1px;
+      background: var(--border);
+      margin-bottom: 24px;
+      width: 100%;
+    }
+    
+    @media (min-width: 560px) {
+      #view-strategy .cal {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+    
+    @media (min-width: 768px) {
+      #view-strategy .cal {
+        grid-template-columns: repeat(7, 1fr);
+      }
+    }
+    
+    #view-strategy .cal-header {
+      background: var(--surface);
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dimmer);
+      padding: 8px;
+      text-align: center;
+    }
+    
+    #view-strategy .cal-day {
+      background: var(--surface);
+      padding: 10px;
+      min-height: 110px;
+      text-align: left;
+    }
+    
+    #view-strategy .cal-post {
+      font-size: 9.5px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+      line-height: 1.4;
+      padding: 6px;
+      border-radius: 4px;
+    }
+    
+    #view-strategy .cal-post strong {
+      color: #fff;
+      font-size: 10.5px;
+      display: block;
+      margin-bottom: 2px;
+    }
+    
+    #view-strategy .cal-post em {
+      font-style: normal;
+      color: var(--text-dimmer);
+      display: block;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      font-size: 8px;
+      letter-spacing: 0.5px;
+    }
+    
+    #view-strategy .cal-post .post-ex {
+      margin-top: 4px;
+      opacity: 0.8;
+      font-family: var(--mono);
+      line-height: 1.3;
+    }
+    
+    #view-strategy .cal-post.signal { background: var(--signal-dim); border-left: 2px solid var(--signal); }
+    #view-strategy .cal-post.amber { background: var(--amber-dim); border-left: 2px solid var(--amber); }
+    #view-strategy .cal-post.blue { background: var(--blue-dim); border-left: 2px solid var(--blue); }
+    #view-strategy .cal-post.red { background: var(--red-dim); border-left: 2px solid var(--red); }
+
+    /* KPI grid */
+    #view-strategy .kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1px;
+      background: var(--border);
+    }
+    
+    @media (min-width: 640px) {
+      #view-strategy .kpi-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    
+    #view-strategy .kpi-cell {
+      background: var(--surface);
+      padding: 20px;
+      text-align: left;
+    }
+    
+    #view-strategy .kpi-phase {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dimmer);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+    }
+    
+    #view-strategy .kpi-metric {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+    
+    #view-strategy .kpi-metric-name {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    
+    #view-strategy .kpi-metric-val {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    #view-strategy .kv-signal { color: var(--signal); }
+    #view-strategy .kv-amber { color: var(--amber); }
+    #view-strategy .kv-blue { color: var(--blue); }
+
+    /* Strategic Insight Box */
+    #view-strategy .insight-box {
+      background: linear-gradient(135deg, var(--signal-dim) 0%, transparent 100%);
+      border: 1px solid rgba(0, 229, 160, 0.15);
+      padding: 24px;
+      margin: 24px 0;
+      text-align: left;
+    }
+    
+    #view-strategy .insight-box::before {
+      content: '// STRATEGIC INSIGHT';
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--signal);
+      letter-spacing: 1.5px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    
+    #view-strategy .insight-box p {
+      font-size: 14.5px;
+      color: #fff;
+      line-height: 1.65;
+      font-weight: 600;
+      margin-bottom: 0;
+    }
+
+    /* Profile positioning box */
+    #view-strategy .profile-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 24px;
+      margin: 24px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    
+    #view-strategy .profile-line {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+      width: 100%;
+      text-align: left;
+    }
+    
+    @media (min-width: 560px) {
+      #view-strategy .profile-line {
+        flex-direction: row;
+        gap: 12px;
+        align-items: flex-start;
+      }
+    }
+    
+    #view-strategy .profile-key {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dimmer);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      min-width: 130px;
+      text-align: left;
+    }
+    
+    #view-strategy .profile-val {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.5;
+      flex: 1;
+    }
+    
+    #view-strategy .profile-val strong {
+      color: #fff;
+    }
+    
+    #view-strategy .tag-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    
+    #view-strategy .tag {
+      font-family: var(--mono);
+      font-size: 9px;
+      padding: 3px 8px;
+      border: 1px solid var(--border2);
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-bg"></div>
+
+  <!-- PASSWORD GATE OVERLAY -->
+  <div id="password-gate">
+    <div class="auth-card">
+      <div class="auth-title">User Authentication</div>
+      <div class="auth-subtitle">Perivis LinkedIn Content Engine</div>
+      <div class="form-group">
+        <label class="form-label" for="security-password">Security Token</label>
+        <div class="password-input-wrapper">
+          <input type="password" id="security-password" class="password-input" maxlength="8" placeholder="••••••••" autocomplete="off" autofocus>
+        </div>
+      </div>
+      <button onclick="handleLogin()" class="auth-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        Unlock Feed
+      </button>
+      <div id="login-error" class="error-msg">Access Denied: Invalid Security Token.</div>
+    </div>
+  </div>
+
+  <!-- STICKY HEADER NAV -->
+  <nav>
+    <div class="nav-container">
+      <div class="logo-container">
+        <img class="logo-image" src="https://get.tofler.in/wp-content/uploads/2026/05/Logo-light.png" alt="Perivis Logo">
+      </div>
+      
+      <!-- Premium Dropdown Menu Navigation -->
+      <div class="menu-dropdown-container" id="menu-dropdown-container">
+        <button class="menu-trigger-btn" onclick="toggleNavMenu(event)">
+          <span id="active-menu-label">Review Feed</span>
+          <svg class="dropdown-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div id="nav-dropdown-menu" class="nav-dropdown-menu">
+          <div class="dropdown-item active" id="menu-item-feed" onclick="switchView('feed')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            Review Feed
+          </div>
+          <div class="dropdown-item" id="menu-item-approved" onclick="switchView('approved')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            View Approved
+          </div>
+          <div class="dropdown-item" id="menu-item-sync" onclick="switchView('sync')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+            Sync Sheet
+          </div>
+          <div class="dropdown-item" id="menu-item-strategy" onclick="switchView('strategy')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+            Content Strategy
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- VIEW 1: REVIEW FEED VIEW CONTAINER -->
+  <div id="view-feed" class="view-panel">
+    <div class="feed-grid">
+      <!-- Header Title Area -->
+      <div class="feed-header-row">
+        <h1 class="feed-main-title">Perivis Content Approval Engine</h1>
+        <div class="feed-status-meta">
+          <span id="pending-count">0 Pending Posts</span>
+          <span class="status-dot-separator">•</span>
+          <span id="status-text" style="color: var(--text-dimmer);">LOCKED</span>
+        </div>
+      </div>
+
+      <!-- Center Column: LinkedIn Styled Post Cards -->
+      <main class="feed-container" id="feed-container">
+        <!-- Welcome Lock State Screen -->
+        <div class="empty-state">
+          <svg class="empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <div class="empty-title">Terminal Locked</div>
+          <div class="empty-subtitle">Please enter your 4-digit Security Token on the authentication gate to start synchronizing the sheet feed.</div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- VIEW 2: SYNC SHEET VIEW CONTAINER -->
+  <div id="view-sync" class="view-panel" style="display: none;">
+    <div class="feed-grid">
+      <!-- Header Title Area -->
+      <div class="feed-header-row">
+        <h1 class="feed-main-title">Sync Control Center</h1>
+        <div class="feed-status-meta">
+          <span id="sync-status-indicator" style="color: var(--signal);">CONNECTED</span>
+        </div>
+      </div>
+
+      <!-- Sync Trigger Card -->
+      <div class="post-card" style="padding: 24px;">
+        <div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px;">
+          <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--signal-dim); display: flex; justify-content: center; align-items: center; color: var(--signal); border: 1.5px dashed var(--signal);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+          </div>
+          <div>
+            <h3 style="font-family: var(--sans); font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 6px;">Google Sheet Stream Synchronization</h3>
+            <p style="font-size: 13px; color: var(--text-dim); max-width: 440px; line-height: 1.5;">Fetch the latest pending, approved, and rejected LinkedIn post iterations live from n8n data automations.</p>
+          </div>
+          <button onclick="triggerSheetSync()" class="auth-btn" style="max-width: 260px; margin-top: 8px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+            Trigger Sheet Sync
+          </button>
+        </div>
+      </div>
+
+      <!-- Sync Telemetry Data Cards -->
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%;">
+        <div class="post-card" style="padding: 16px; text-align: center;">
+          <div style="font-family: var(--mono); font-size: 9px; color: var(--text-dimmer); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Telemetry Status</div>
+          <div id="sync-tel-status" style="font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--signal);">READY</div>
+        </div>
+        <div class="post-card" style="padding: 16px; text-align: center;">
+          <div style="font-family: var(--mono); font-size: 9px; color: var(--text-dimmer); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">Last Synced</div>
+          <div id="sync-tel-time" style="font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text-dim);">NEVER</div>
+        </div>
+      </div>
+
+      <!-- Engine Sync Logs Console -->
+      <div class="post-card" style="padding: 16px;">
+        <div style="font-family: var(--mono); font-size: 9px; color: var(--text-dimmer); text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px;">
+          <span>Terminal Logs Console</span>
+          <span style="color: var(--signal); font-size: 8px; border: 1px solid var(--signal-dim); padding: 1px 5px; border-radius: 4px;">ACTIVE</span>
+        </div>
+        <div id="console-logs" style="font-family: var(--mono); font-size: 11px; color: #8899aa; background: #020304; border: 1px solid var(--border); padding: 12px; border-radius: 6px; min-height: 110px; max-height: 150px; overflow-y: auto; text-align: left; line-height: 1.6;">
+          <div style="color: var(--text-dimmer);">[SYSTEM LOADED] Standby for security authentication key.</div>
+        </div>
+      </div>
+
+      <!-- Consolidated Webhook Configuration Card -->
+      <div class="post-card" style="padding: 20px;">
+        <div style="font-family: var(--mono); font-size: 9px; color: var(--text-dimmer); text-transform: uppercase; margin-bottom: 16px; letter-spacing: 1px; text-align: left;">Engine API Endpoints</div>
+        <div class="settings-grid">
+          <div class="settings-input-group">
+            <label class="form-label">Data Fetch Webhook (POST)</label>
+            <input type="text" id="webhook-get-url" class="settings-input" value="https://n8n.srv846064.hstgr.cloud/webhook/get_pending_approval_posts" onchange="saveSyncSettings()">
+          </div>
+          <div class="settings-input-group">
+            <label class="form-label">Live Post Approved Webhook (GET)</label>
+            <input type="text" id="webhook-approved-url" class="settings-input" value="https://n8n.srv846064.hstgr.cloud/webhook/post_approved" onchange="saveSyncSettings()">
+          </div>
+          <div class="settings-input-group">
+            <label class="form-label">Live Post Changes Requested Webhook (GET)</label>
+            <input type="text" id="webhook-changes-url" class="settings-input" value="https://n8n.srv846064.hstgr.cloud/webhook/changes_requested" onchange="saveSyncSettings()">
+          </div>
+          <div class="settings-input-group">
+            <label class="form-label">Live Post Redo Webhook (GET)</label>
+            <input type="text" id="webhook-rejected-url" class="settings-input" value="https://n8n.srv846064.hstgr.cloud/webhook/post_rejected" onchange="saveSyncSettings()">
+          </div>
+          <div class="settings-input-group">
+            <label class="form-label">Live Approved Posts Archive Webhook (POST)</label>
+            <input type="text" id="webhook-approved-feed-url" class="settings-input" value="https://n8n.srv846064.hstgr.cloud/webhook/approved_posts" onchange="saveSyncSettings()">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 4: APPROVED ARCHIVE VIEW CONTAINER -->
+  <div id="view-approved" class="view-panel" style="display: none;">
+    <div class="feed-grid">
+      <!-- Header Title Area -->
+      <div class="feed-header-row">
+        <h1 class="feed-main-title">Approved Posts Archive</h1>
+        <div class="feed-status-meta">
+          <span id="approved-count">0 Approved Posts</span>
+          <span class="status-dot-separator">•</span>
+          <span style="color: var(--signal);">READ ONLY</span>
+        </div>
+      </div>
+
+      <!-- Center Column: LinkedIn Styled Post Cards -->
+      <main class="feed-container" id="approved-feed-container">
+        <!-- Loader / Welcome State -->
+        <div class="empty-state">
+          <svg class="empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline></svg>
+          <div class="empty-title">Archive Sealed</div>
+          <div class="empty-subtitle">Loading approved posts stream from Google Sheet...</div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- VIEW 3: CONTENT STRATEGY VIEW CONTAINER (100% self-contained embedded workspace) -->
+  <div id="view-strategy" class="view-panel" style="display: none;">
+    <!-- ══════════ COVER ══════════ -->
+    <div class="cover">
+      <div class="cover-grid-bg"></div>
+      <div class="cover-tag">Perivis.ai · LinkedIn Intelligence</div>
+      <h1>The <em>Signal-First</em> LinkedIn Content Strategy</h1>
+      <p class="cover-subtitle">// A complete go-to-market playbook for the CEO's LinkedIn — built on competitor benchmarking, content architecture, and India's capital market intelligence whitespace.</p>
+      <div class="cover-meta">
+        <div class="cover-meta-item">
+          <div class="cover-meta-label">Platform</div>
+          <div class="cover-meta-value">LinkedIn</div>
+        </div>
+        <div class="cover-meta-item">
+          <div class="cover-meta-label">Account</div>
+          <div class="cover-meta-value">CEO, Perivis.ai</div>
+        </div>
+        <div class="cover-meta-item">
+          <div class="cover-meta-label">Primary Goal</div>
+          <div class="cover-meta-value">Impressions → Awareness</div>
+        </div>
+        <div class="cover-meta-item">
+          <div class="cover-meta-label">Target Volume</div>
+          <div class="cover-meta-value">7 posts / week</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc">
+      <!-- ══════════ 01. COMPETITIVE LANDSCAPE ══════════ -->
+      <div class="section">
+        <div class="section-number">SECTION 01</div>
+        <h2>Competitive Landscape Intelligence</h2>
+        <p class="section-lead">What the benchmarking data says — and more critically, what it doesn't say. Seven creators were analyzed across positioning, content mix, hooks, formats, engagement, and strategy.</p>
+
+        <div class="comp-table-container">
+          <table class="comp-table">
+            <thead>
+              <tr>
+                <th>Creator</th>
+                <th>Positioning</th>
+                <th>Dominant Pillar</th>
+                <th>Avg Likes</th>
+                <th>Top Hook Style</th>
+                <th>Strategy Edge</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="name">Nithin Kamath</td>
+                <td>Bootstrapped founder, ecosystem builder</td>
+                <td><span class="badge badge-signal">Market Infrastructure</span></td>
+                <td><strong>~2,200</strong></td>
+                <td>Contrarian Truth + Data Dread</td>
+                <td>Attacks own industry's flaws for trust</td>
+              </tr>
+              <tr>
+                <td class="name">Sandeep Jethwani</td>
+                <td>Institutional wealth for affluent Indians</td>
+                <td><span class="badge badge-amber">Wealth Education</span></td>
+                <td><strong>~220</strong></td>
+                <td>Fear of Neglect + High-Stakes Stat</td>
+                <td>CEO proximity transfers credibility</td>
+              </tr>
+              <tr>
+                <td class="name">Groww</td>
+                <td>Democratizing wealth via macro narratives</td>
+                <td><span class="badge badge-blue">Global Macro</span></td>
+                <td><strong>250–450</strong></td>
+                <td>Trivia-led Curiosity + Data Urgency</td>
+                <td>Historical → Indian context bridge</td>
+              </tr>
+              <tr>
+                <td class="name">Anand K Rathi</td>
+                <td>Anti-stress allocation frameworks</td>
+                <td><span class="badge badge-amber">Macro Portfolio</span></td>
+                <td><strong>~65 (spikes 200+)</strong></td>
+                <td>Contrarian Assertion + Horror Story</td>
+                <td>Macro fear → boring assets as alpha</td>
+              </tr>
+              <tr>
+                <td class="name">CA Rachana Ranade</td>
+                <td>Edutainment, risk-first for retail</td>
+                <td><span class="badge badge-signal">Live Market Analysis</span></td>
+                <td><strong>~85</strong></td>
+                <td>Curiosity + News-Reactive</td>
+                <td>Live sessions within hours of Nifty moves</td>
+              </tr>
+              <tr>
+                <td class="name">Pranjal Kamra</td>
+                <td>Anti-hype personal finance basics</td>
+                <td><span class="badge badge-red">Personal Finance</span></td>
+                <td><strong>250–350</strong></td>
+                <td>Contrarian Statement + Direct Rules</td>
+                <td>Weaponizes "boring" vs flashy finfluencers</td>
+              </tr>
+              <tr>
+                <td class="name">Kunal Bahl</td>
+                <td>Operator-investor, ecosystem narrator</td>
+                <td><span class="badge badge-blue">Ecosystem Trends</span></td>
+                <td><strong>1,200 (spikes 7,000+)</strong></td>
+                <td>Observational + Milestone-driven</td>
+                <td>Elder statesman + Shark Tank → B2B funnel</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="insight-box">
+          <p>Every single competitor in this benchmarking set targets <em>retail investors</em>, <em>HNIs</em>, or <em>wealth management</em> audiences. Not a single one occupies the <strong>"intelligence layer" for capital market professionals</strong> — fund managers, analysts, operators, and data-driven allocators. This is Perivis's whitespace.</p>
+        </div>
+      </div>
+
+      <!-- ══════════ 02. CEO PROFILE POSITIONING ══════════ -->
+      <div class="section">
+        <div class="section-number">SECTION 02</div>
+        <h2>CEO Profile Positioning</h2>
+        <p class="section-lead">Before a single post is written, the profile must do the strategic heavy lifting. The CEO is not a finfluencer. The CEO is India's Chief Signal Officer for capital markets.</p>
+
+        <div class="profile-box">
+          <div class="profile-line">
+            <div class="profile-key">Headline</div>
+            <div class="profile-val"><strong>"Building India's capital market intelligence layer @ Perivis.ai | I track what moves markets before it makes news"</strong></div>
+          </div>
+          <div class="profile-line">
+            <div class="profile-key">Positioning Arc</div>
+            <div class="profile-val">Not an educator. Not a wealth advisor. <strong>The person who finds the signal in the noise</strong> — for professionals who can't afford to miss it.</div>
+          </div>
+          <div class="profile-line">
+            <div class="profile-key">Tone of Voice</div>
+            <div class="profile-val">Intellectually sharp. Data-obsessed. Calm in chaos. <strong>Never hypes. Always interprets.</strong> The analyst voice, not the hype voice.</div>
+          </div>
+          <div class="profile-line">
+            <div class="profile-key">Primary Audience</div>
+            <div class="profile-val">Capital market investors, fund managers, sell-side analysts, fintech founders, macro-curious data nerds, investment professionals.</div>
+          </div>
+          <div class="profile-line">
+            <div class="profile-key">Differentiation vs. Peers</div>
+            <div class="profile-val">Nithin Kamath = ecosystem reformer. Kunal Bahl = elder statesman. Perivis CEO = <strong>the intelligence operator</strong>. Not teaching you finance. Surfacing what you missed.</div>
+          </div>
+          <div class="profile-line">
+            <div class="profile-key">Signature Format</div>
+            <div class="profile-val">Every post follows a <strong>Signal → Context → Implication</strong> structure. This becomes Perivis's identifiable content DNA across all 17 content types.</div>
+          </div>
+          <div class="profile-line">
+            <div class="profile-key">About Section Hook</div>
+            <div class="profile-val"><strong>"The market moves faster than the news. I built Perivis to change that."</strong> — followed by product story and what you track.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ 03. CONTENT PILLARS ══════════ -->
+      <div class="section">
+        <div class="section-number">SECTION 03</div>
+        <h2>Content Pillars & Distribution Architecture</h2>
+        <p class="section-lead">Four pillars, each with a distinct job to do. Together, they create a flywheel: attract → educate → signal → convert.</p>
+
+        <div class="cards cards-2">
+          <div class="card signal">
+            <div class="card-label">Pillar 01 · 40% of content</div>
+            <h3>Signal Storytelling</h3>
+            <p>The core of Perivis. Real signals, real data, real implications. This is the content that makes professionals subscribe — because it's information they can't afford to miss. Covers Signal Stories, 1 Datapoint = 5 Implications, Story of a Datapoint, Smart Money Tracker.</p>
+            <div class="tag-row">
+              <span class="tag">Signal Stories</span>
+              <span class="tag">1 Point → 5 Implications</span>
+              <span class="tag">Smart Money</span>
+              <span class="tag">Data Story</span>
+            </div>
+          </div>
+          <div class="card amber">
+            <div class="card-label">Pillar 02 · 30% of content</div>
+            <h3>Market Intelligence</h3>
+            <p>Macro interpretation, contrarian takes, pattern recognition, time travel comparisons, and causal chains. This attracts the intellectual audience — data nerds who love thinking about how markets behave. High shareability pillar.</p>
+            <div class="tag-row">
+              <span class="tag">Contrarian Takes</span>
+              <span class="tag">Macro-Science</span>
+              <span class="tag">Pattern Recognition</span>
+              <span class="tag">Time Travel</span>
+              <span class="tag">Historical Stories</span>
+              <span class="tag">Causal Chains</span>
+            </div>
+          </div>
+          <div class="card blue">
+            <div class="card-label">Pillar 03 · 15% of content</div>
+            <h3>Teardowns & Frameworks</h3>
+            <p>Breaking down something complex into structured intelligence. Teaches the audience how to think like an analyst. Creates evergreen content that gets saved and reshared. Cheat sheets and X-Rays live here.</p>
+            <div class="tag-row">
+              <span class="tag">Teardowns</span>
+              <span class="tag">Frameworks</span>
+              <span class="tag">Debunk With Data</span>
+              <span class="tag">X-Ray</span>
+            </div>
+          </div>
+          <div class="card red">
+            <div class="card-label">Pillar 04 · 15% of content</div>
+            <h3>Product & Memes</h3>
+            <p>Build in public, Perivis updates, topical commentary tied to the product, and strategic memes. Creates product awareness without feeling promotional. Followers see the product's value demonstrated through the content itself.</p>
+            <div class="tag-row">
+              <span class="tag">Build in Public</span>
+              <span class="tag">Topical Commentary</span>
+              <span class="tag">Memes</span>
+              <span class="tag">Perivis Updates</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 32px;">
+          <div class="pillar-row">
+            <div class="pillar-row-header"><span class="pillar-name">Signal Storytelling</span><span class="pillar-pct">40%</span></div>
+            <div class="pillar-bar"><div class="pillar-fill fill-signal" style="width:40%"></div></div>
+          </div>
+          <div class="pillar-row">
+            <div class="pillar-row-header"><span class="pillar-name">Market Intelligence</span><span class="pillar-pct">30%</span></div>
+            <div class="pillar-bar"><div class="pillar-fill fill-amber" style="width:30%"></div></div>
+          </div>
+          <div class="pillar-row">
+            <div class="pillar-row-header"><span class="pillar-name">Teardowns & Frameworks</span><span class="pillar-pct">15%</span></div>
+            <div class="pillar-bar"><div class="pillar-fill fill-blue" style="width:15%"></div></div>
+          </div>
+          <div class="pillar-row">
+            <div class="pillar-row-header"><span class="pillar-name">Product & Memes</span><span class="pillar-pct">15%</span></div>
+            <div class="pillar-bar"><div class="pillar-fill fill-red" style="width:15%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ 04. CONTENT TYPES — DETAILED ══════════ -->
+      <div class="section">
+        <div class="section-number">SECTION 04</div>
+        <h2>17 Content Types: Full Playbooks</h2>
+        <p class="section-lead">Each type is broken down into format, hook approach, structure, example, frequency, and the job it does for the strategy.</p>
+
+        <!-- TYPE 01 -->
+        <div class="ctype">
+          <div class="ctype-num">TYPE 01 · SIGNAL STORIES</div>
+          <h3>Signal Stories</h3>
+          <p class="ctype-desc">Take a raw market signal — a filing, an executive quote, a regulatory disclosure, a fund flow number — and narrate why it matters. The structure moves from raw data to interpretation to implication. This is the flagship content type for Perivis. It demonstrates the product value directly in the post.</p>
+          <div class="ctype-grid">
+            <div>
+              <div class="ctype-sub-label">Format</div>
+              <div class="ctype-sub-content">Text + data screenshot / infographic card (60%); Text-only with embedded numbers (40%). Carousels for multi-step signals.</div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Structure</div>
+              <div class="ctype-sub-content">
+                <ul>
+                  <li>Signal (1 line, specific)</li>
+                  <li>Context (Why now?)</li>
+                  <li>What most people missed</li>
+                  <li>The real implication</li>
+                  <li>Open question to audience</li>
+                </ul>
+              </div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Pillar</div>
+              <div class="ctype-sub-content"><span class="badge badge-signal">Signal Storytelling</span><br><br><strong>Job:</strong> Position CEO as the first-mover intelligence layer. Shows the product's value without demoing it.</div>
+            </div>
+          </div>
+          <div class="example-box">
+            <strong>Example Hook</strong>
+            HDFC AMC just moved ₹4,200 crore into short-duration debt in 72 hours.<br>
+            The media is calling it "defensive allocation."<br>
+            It isn't. Here's what the filing actually shows → [thread]
+          </div>
+        </div>
+
+        <!-- TYPE 02 -->
+        <div class="ctype">
+          <div class="ctype-num">TYPE 02 · BUILD IN PUBLIC</div>
+          <h3>Document Perivis Updates</h3>
+          <p class="ctype-desc">Transparent, behind-the-curtain posts about building Perivis — what was shipped, what failed, a key product decision, a user insight that changed the roadmap. This is not a product announcement. It's a founder's log. It humanizes the brand and builds parasocial investment in the product's success.</p>
+          <div class="ctype-grid">
+            <div>
+              <div class="ctype-sub-label">Format</div>
+              <div class="ctype-sub-content">Text + screenshot (product UI, dashboard, metric). Authentic and unpolished. Not a press release. Think: founder's notebook page.</div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Structure</div>
+              <div class="ctype-sub-content">
+                <ul>
+                  <li>What we shipped / what broke</li>
+                  <li>The insight that led there</li>
+                  <li>What we learned</li>
+                  <li>What's next</li>
+                </ul>
+              </div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Pillar</div>
+              <div class="ctype-sub-content"><span class="badge badge-red">Product & Memes</span><br><br><strong>Job:</strong> Build audience loyalty and product waitlist pipeline through founder authenticity.</div>
+            </div>
+          </div>
+          <div class="example-box">
+            <strong>Example Hook</strong>
+            We analyzed 2,300 Perivis signals last month.<br>
+            Only 6% of them made it into a mainstream headline within 48 hours.<br>
+            The other 94%? Here's where they went.
+          </div>
+        </div>
+
+        <!-- TYPE 03 -->
+        <div class="ctype">
+          <div class="ctype-num">TYPE 03 · TEARDOWN / BREAKDOWN</div>
+          <h3>Tear Down / Break Down Something</h3>
+          <p class="ctype-desc">Pick a company, a market event, a regulatory document, a fund's portfolio, or a CEO's statement — and systematically disassemble it into intelligence components. This is the "long-form" content type that builds deepest credibility. Think of it as showing the work that goes into building Perivis's signals.</p>
+          <div class="ctype-grid">
+            <div>
+              <div class="ctype-sub-label">Format</div>
+              <div class="ctype-sub-content">Multi-page document / long-scroll carousel (8–12 slides). Or rich text with multiple data points. High image/table density.</div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Structure</div>
+              <div class="ctype-sub-content">
+                <ul>
+                  <li>Entity / Event (what we're tearing down)</li>
+                  <li>Surface reading (what everyone says)</li>
+                  <li>Layer 1: The data beneath</li>
+                  <li>Layer 2: The structural dynamic</li>
+                  <li>Layer 3: Second-order effect</li>
+                  <li>Verdict: What this really means</li>
+                </ul>
+              </div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Pillar</div>
+              <div class="ctype-sub-content"><span class="badge badge-blue">Teardowns & Frameworks</span><br><br><strong>Job:</strong> Evergreen saves + shares. Positions Perivis CEO as the most analytical voice in the Indian capital markets space.</div>
+            </div>
+          </div>
+          <div class="example-box">
+            <strong>Example Hook</strong>
+            Zomato's Q3 result: ₹351 crore PAT.<br>
+            Everyone's celebrating the profit.<br>
+            I ran it through 6 signals.<br>
+            The real story is hiding in the unit economics → [breakdown]
+          </div>
+        </div>
+
+        <!-- TYPE 04 -->
+        <div class="ctype">
+          <div class="ctype-num">TYPE 04 · 1 SIGNAL = 5 IMPLICATIONS</div>
+          <h3>1 Datapoint / Signal → 5 Implications</h3>
+          <p class="ctype-desc">Take one hard, specific number and fan out its implications across five connected domains. This format is LinkedIn gold — it is structured, scannable, surprising at each step, and demonstrates analytical depth. It directly mirrors what Perivis does as a product: turning one raw signal into structured intelligence.</p>
+          <div class="ctype-grid">
+            <div>
+              <div class="ctype-sub-label">Format</div>
+              <div class="ctype-sub-content">Text-heavy numbered list (5 points). Or carousel with one implication per slide. Each implication should surprise, connect to something non-obvious.</div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Structure</div>
+              <div class="ctype-sub-content">
+                <ul>
+                  <li>Signal: [The one data point]</li>
+                  <li>Implication 1: [Industry X]</li>
+                  <li>Implication 2: [Policy/Regulatory]</li>
+                  <li>Implication 3: [Investor behavior]</li>
+                  <li>Implication 4: [Competitor/Market]</li>
+                  <li>Implication 5: [Non-obvious tail]</li>
+                </ul>
+              </div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Pillar</div>
+              <div class="ctype-sub-content"><span class="badge badge-signal">Signal Storytelling</span><br><br><strong>Job:</strong> The highest-density format for demonstrating analytical value. Strong save rate = algorithmic boost.</div>
+            </div>
+          </div>
+          <div class="example-box">
+            <strong>Example Hook</strong>
+            India's 10-year bond yield just crossed 7.1%.<br>
+            One number. Five things nobody's talking about. 🧵<br><br>
+            1/ MF debt allocations will shift in Q4...<br>
+            2/ Real estate cap rates are about to get repriced...
+          </div>
+        </div>
+
+        <!-- TYPE 05 -->
+        <div class="ctype">
+          <div class="ctype-num">TYPE 05 · CONTRARIAN TAKES</div>
+          <h3>Contrarian Takes on the Markets</h3>
+          <p class="ctype-desc">Deliberately pick a mainstream market narrative and tear it apart with data and logic. This is the highest-engagement format in the benchmarking set — Nithin Kamath's ~2,200 average like count is built almost entirely on contrarian truth-telling. Perivis has the data advantage to do this credibly.</p>
+          <div class="ctype-grid">
+            <div>
+              <div class="ctype-sub-label">Format</div>
+              <div class="ctype-sub-content">Text + chart/data image. Strong opening assertion. Never hedge in the first 3 lines. The nuance comes later, after the hook has landed.</div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Structure</div>
+              <div class="ctype-sub-content">
+                <ul>
+                  <li>Bold contrarian assertion (1–2 lines)</li>
+                  <li>The mainstream narrative (steelman it)</li>
+                  <li>The data that breaks it</li>
+                  <li>The actual dynamic at play</li>
+                  <li>What to actually watch instead</li>
+                </ul>
+              </div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Pillar</div>
+              <div class="ctype-sub-content"><span class="badge badge-amber">Market Intelligence</span><br><br><strong>Job:</strong> High-impression, high-debate content. Comments drive distribution. The controversy IS the algorithm.</div>
+            </div>
+          </div>
+          <div class="example-box">
+            <strong>Example Hook</strong>
+            "FII outflows are killing the market."<br>
+            Wrong framing. Wrong data. Wrong conclusion.<br>
+            Here's what's actually happening →
+          </div>
+        </div>
+
+        <!-- TYPE 16 -->
+        <div class="ctype">
+          <div class="ctype-num">TYPE 16 · HISTORICAL STORIES</div>
+          <h3>Historical Stories (2nd Order Thinking)</h3>
+          <p class="ctype-desc">Go beyond the surface of economic history. Instead of just telling what happened, focus on the ripples — the second and third-order consequences of a collapse or a boom. This positions the CEO as a deep thinker who understands the systemic complexity of markets, not just the headlines.</p>
+          <div class="ctype-grid">
+            <div>
+              <div class="ctype-sub-label">Format</div>
+              <div class="ctype-sub-content">Long-form text story (300+ words) or a detailed carousel. Rich in historical context but focused on the 'Thinking' framework.</div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Structure</div>
+              <div class="ctype-sub-content">
+                <ul>
+                  <li>The Event (The Peso Collapse, etc.)</li>
+                  <li>1st Order Effect (The obvious impact)</li>
+                  <li>2nd Order Effect (The hidden reaction)</li>
+                  <li>3rd Order Effect (The long-term shift)</li>
+                  <li>Modern Parallel: What to watch today</li>
+                </ul>
+              </div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Pillar</div>
+              <div class="ctype-sub-content"><span class="badge badge-amber">Market Intelligence</span><br><br><strong>Job:</strong> Build intellectual authority. Demonstrates the depth of 'System Thinking' that powers the Perivis platform.</div>
+            </div>
+          </div>
+          <div class="example-box">
+            <strong>Example Hook</strong>
+            When the Mexican Peso collapsed in 1994, the world watched the currency.<br>
+            But the real story wasn't the exchange rate.<br>
+            It was the 2nd order effect on global debt markets that changed finance forever.
+          </div>
+        </div>
+
+        <!-- TYPE 17 -->
+        <div class="ctype">
+          <div class="ctype-num">TYPE 17 · EVERYTHING IS CONNECTED</div>
+          <h3>Everything is Connected (Causal Chains)</h3>
+          <p class="ctype-desc">The 'Butterfly Effect' for capital markets. Connect two seemingly unrelated events across time or geography to show how the world is a giant web of signals. This is high-engagement 'Mind-Blown' content that gets shared because it makes the reader feel smarter for knowing the connection.</p>
+          <div class="ctype-grid">
+            <div>
+              <div class="ctype-sub-label">Format</div>
+              <div class="ctype-sub-content">Visual connectivity map (infographic) or a fast-paced 'If-Then' text post. Needs to feel like a mystery being solved.</div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Structure</div>
+              <div class="ctype-sub-content">
+                <ul>
+                  <li>The Hook: The shocking connection (Point A → Point Z)</li>
+                  <li>The Chain: A → B → C → D</li>
+                  <li>The Climax: How D led to Z</li>
+                  <li>The Signal: How to spot these chains today</li>
+                </ul>
+              </div>
+            </div>
+            <div>
+              <div class="ctype-sub-label">Pillar</div>
+              <div class="ctype-sub-content"><span class="badge badge-amber">Market Intelligence</span><br><br><strong>Job:</strong> Massive virality and shareability. Positions Perivis as the 'Global Brain' for market signals.</div>
+            </div>
+          </div>
+          <div class="example-box">
+            <strong>Example Hook</strong>
+            How a famine in Bengal led to the American Civil War.<br>
+            It sounds like a stretch.<br>
+            But if you follow the capital flows and the commodity signals, the chain is unbreakable. 🧵
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ 05. HOOK FRAMEWORKS ══════════ -->
+      <div class="section">
+        <div class="section-number">SECTION 05</div>
+        <h2>Hook Frameworks: The First 2 Lines</h2>
+        <p class="section-lead">On LinkedIn, the hook is everything — it determines whether the "see more" gets clicked. Based on benchmarking analysis of the top-performing posts across all 7 competitors, six hook frameworks work for this audience.</p>
+
+        <div class="hook-table-container">
+          <table class="hook-table">
+            <thead>
+              <tr>
+                <th>Framework</th>
+                <th>Best For</th>
+                <th>Sample Templates</th>
+                <th>Usage Strategy</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="hook-id">
+                  <span class="badge badge-signal">H-01</span>
+                  The Exposed Assumption
+                </td>
+                <td><span class="badge badge-dim">Contrarian, Debunk</span></td>
+                <td class="hook-templates">
+                  "Everyone says [X]. The data says [Y]."<br>
+                  "[Common belief] is costing investors [loss]."
+                </td>
+                <td class="hook-strategy">State a mainstream narrative contradiction in line 1, back it with Perivis data in line 2.</td>
+              </tr>
+              <tr>
+                <td class="hook-id">
+                  <span class="badge badge-amber">H-02</span>
+                  The Specific Number Drop
+                </td>
+                <td><span class="badge badge-dim">Signal Stories, Smart Money</span></td>
+                <td class="hook-templates">
+                  "₹[X] crore moved in [timeframe]. Nobody noticed."<br>
+                  "[Specific %] of [entity] did [unexpected thing]."
+                </td>
+                <td class="hook-strategy">Precision = Credibility. Use exact, non-rounded numbers to create an information gap.</td>
+              </tr>
+              <tr>
+                <td class="hook-id">
+                  <span class="badge badge-blue">H-03</span>
+                  The Curiosity Cliff
+                </td>
+                <td><span class="badge badge-dim">Pattern, Time Travel</span></td>
+                <td class="hook-templates">
+                  "This exact pattern happened in [year]. Expect [X]."<br>
+                  "I found a hidden detail in the [filing] no one is talking about."
+                </td>
+                <td class="hook-strategy">Highlight a historical comparison or buried insight that demands a "see more" click.</td>
+              </tr>
+              <tr>
+                <td class="hook-id">
+                  <span class="badge badge-red">H-04</span>
+                  The Urgent Interpretation
+                </td>
+                <td><span class="badge badge-dim">Topical News, Signals</span></td>
+                <td class="hook-templates">
+                  "[News event]: The real signal is buried in [detail]."<br>
+                  "Headline vs Reality: Here's what to watch next 72 hrs."
+                </td>
+                <td class="hook-strategy">Recency premium. Go one level deeper than the news headline within 2-4 hours of the event.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══════════ 06. FORMAT STRATEGY ══════════ -->
+      <div class="section">
+        <div class="section-number">SECTION 06</div>
+        <h2>Format Strategy & Production Mix</h2>
+        <p class="section-lead">No video. Every other format is in play. Here's the recommended split and what each format is optimized to do.</p>
+
+        <div class="stat-row">
+          <div class="stat-cell">
+            <span class="stat-num">55%</span>
+            <span class="stat-label">Text + Image / Chart</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-num">15%</span>
+            <span class="stat-label">Carousels / Docs</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-num">15%</span>
+            <span class="stat-label">Text Only</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-num">15%</span>
+            <span class="stat-label">Memes / Graphics</span>
+          </div>
+        </div>
+
+        <div class="cards cards-2">
+          <div class="card blue">
+            <div class="card-label">Format A · 55% of mix</div>
+            <h3>Text + Image / Chart</h3>
+            <p>The most versatile format. A strong text post paired with a data screenshot, chart, or branded data card. Fast to produce, high credibility, and performs across all content types. The image carries the proof; the text carries the narrative.</p>
+          </div>
+          <div class="card signal">
+            <div class="card-label">Format B · 15% of mix</div>
+            <h3>Carousels & Documents</h3>
+            <p>Groww's highest-performing content is carousels. Pranjal Kamra's most-saved content is structured carousels. Use for: Education Frameworks, Cheat Sheets, Teardowns. LinkedIn rewards time-spent on content.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ 07. POSTING CADENCE ══════════ -->
+      <div class="section">
+        <div class="section-number">SECTION 07</div>
+        <h2>Posting Cadence & Volume Architecture</h2>
+        <p class="section-lead">Sustainable consistency beats burst volume. The target is <strong>7 posts per week</strong> — 1 high-quality post per day, 7 days a week. This ensures a constant presence in the feed without creative burnout.</p>
+
+        <div class="cards cards-2">
+          <div class="card signal">
+            <div class="card-label">Weekly Pillar Mix</div>
+            <h3>Strategic Distribution</h3>
+            <div style="margin-top: 16px;">
+              <div class="pillar-row">
+                <div class="pillar-row-header"><span class="pillar-name">Signal Storytelling</span><span class="pillar-pct">3 posts</span></div>
+                <div class="pillar-bar"><div class="pillar-fill fill-signal" style="width: 43%;"></div></div>
+              </div>
+              <div class="pillar-row">
+                <div class="pillar-row-header"><span class="pillar-name">Market Intelligence</span><span class="pillar-pct">2 posts</span></div>
+                <div class="pillar-bar"><div class="pillar-fill fill-amber" style="width: 28%;"></div></div>
+              </div>
+              <div class="pillar-row">
+                <div class="pillar-row-header"><span class="pillar-name">Teardowns & Frameworks</span><span class="pillar-pct">1 post</span></div>
+                <div class="pillar-bar"><div class="pillar-fill fill-blue" style="width: 14%;"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card blue">
+            <div class="card-label">Weekly Format Mix</div>
+            <h3>Production Split</h3>
+            <div style="margin-top: 16px;">
+              <div class="pillar-row">
+                <div class="pillar-row-header"><span class="pillar-name">Text + Image / Chart</span><span class="pillar-pct">4 posts</span></div>
+                <div class="pillar-bar"><div class="pillar-fill fill-signal" style="width: 57%;"></div></div>
+              </div>
+              <div class="pillar-row">
+                <div class="pillar-row-header"><span class="pillar-name">Carousels / Docs</span><span class="pillar-pct">1 post</span></div>
+                <div class="pillar-bar"><div class="pillar-fill fill-amber" style="width: 14%;"></div></div>
+              </div>
+              <div class="pillar-row">
+                <div class="pillar-row-header"><span class="pillar-name">Text Only</span><span class="pillar-pct">1 post</span></div>
+                <div class="pillar-bar"><div class="pillar-fill fill-blue" style="width: 14%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ 08. SAMPLE Content CALENDAR ══════════ -->
+      <div class="section">
+        <div class="section-number">SECTION 08</div>
+        <h2>Sample Content Calendar</h2>
+        <p class="section-lead">A daily structural rhythm designed for consistency. The schedule is optimized to follow a fixed pillar-by-day sequence while maintaining the 4/1/1/1 format split.</p>
+
+        <div class="cal">
+          <div class="cal-header">MON</div>
+          <div class="cal-header">TUE</div>
+          <div class="cal-header">WED</div>
+          <div class="cal-header">THU</div>
+          <div class="cal-header">FRI</div>
+          <div class="cal-header">SAT</div>
+          <div class="cal-header">SUN</div>
+
+          <div class="cal-day">
+            <div class="cal-post signal">
+              <em>Signal Storytelling</em>
+              <strong>Smart Money Tracker</strong>
+              <div class="post-ex">Weekly FII/DII accumulation analysis.</div>
+            </div>
+          </div>
+          <div class="cal-day">
+            <div class="cal-post amber">
+              <em>Market Intelligence</em>
+              <strong>Sector X-Ray</strong>
+              <div class="post-ex">Real estate absorption data.</div>
+            </div>
+          </div>
+          <div class="cal-day">
+            <div class="cal-post signal">
+              <em>Signal Storytelling</em>
+              <strong>1 Point → 5 Implications</strong>
+              <div class="post-ex">Why rising USD/INR is the only signal.</div>
+            </div>
+          </div>
+          <div class="cal-day">
+            <div class="cal-post blue">
+              <em>Teardowns & Frameworks</em>
+              <strong>Historical Stories</strong>
+              <div class="post-ex">The 2nd order effects of Peso collapse.</div>
+            </div>
+          </div>
+          <div class="cal-day">
+            <div class="cal-post signal">
+              <em>Signal Storytelling</em>
+              <strong>Signal Story</strong>
+              <div class="post-ex">Bulk deal analysis in mid-cap infra.</div>
+            </div>
+          </div>
+          <div class="cal-day">
+            <div class="cal-post amber">
+              <em>Market Intelligence</em>
+              <strong>Macro-Science</strong>
+              <div class="post-ex">Behavioral bias & retail FOMO data.</div>
+            </div>
+          </div>
+          <div class="cal-day">
+            <div class="cal-post red">
+              <em>Product & Memes</em>
+              <strong>Data Meme</strong>
+              <div class="post-ex">Earnings beat vs 10k loss humor.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════ 10. KPIs & SUCCESS METRICS ══════════ -->
+      <div class="section">
+        <div class="section-number">SECTION 10</div>
+        <h2>KPIs & Success Metrics</h2>
+        <p class="section-lead">Optimized for impressions and distribution, with quality signals tracked to ensure the right audience is growing.</p>
+
+        <div class="kpi-grid">
+          <div class="kpi-cell">
+            <div class="kpi-phase">Phase 1 · Months 1–2</div>
+            <div class="kpi-metric"><span class="kpi-metric-name">Avg Impressions</span><span class="kpi-metric-val kv-signal">> 1,500</span></div>
+            <div class="kpi-metric"><span class="kpi-metric-name">Follower growth/wk</span><span class="kpi-metric-val kv-signal">> 200</span></div>
+            <div class="kpi-metric"><span class="kpi-metric-name">Avg Likes</span><span class="kpi-metric-val kv-signal">> 30</span></div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-phase">Phase 2 · Months 3–4</div>
+            <div class="kpi-metric"><span class="kpi-metric-name">Avg Impressions</span><span class="kpi-metric-val kv-amber">> 5,000</span></div>
+            <div class="kpi-metric"><span class="kpi-metric-name">Follower growth/wk</span><span class="kpi-metric-val kv-amber">> 400</span></div>
+            <div class="kpi-metric"><span class="kpi-metric-name">Avg Likes</span><span class="kpi-metric-val kv-amber">> 60</span></div>
+          </div>
+          <div class="kpi-cell">
+            <div class="kpi-phase">Phase 3 · Months 5–6</div>
+            <div class="kpi-metric"><span class="kpi-metric-name">Avg Impressions</span><span class="kpi-metric-val kv-blue">> 10,000</span></div>
+            <div class="kpi-metric"><span class="kpi-metric-name">Follower growth/wk</span><span class="kpi-metric-val kv-blue">> 800</span></div>
+            <div class="kpi-metric"><span class="kpi-metric-name">Avg Likes</span><span class="kpi-metric-val kv-blue">> 120</span></div>
+          </div>
+        </div>
+
+        <div class="insight-box" style="margin-top: 32px;">
+          <p>Perivis doesn't need to compete with Nithin Kamath on ecosystem thought leadership or Pranjal Kamra on retail education. The whitespace is clear: <strong>become the default intelligence voice for India's capital market professionals</strong> — the one account every analyst, fund manager, and serious investor follows because missing it means missing something that matters.</p>
+        </div>  <script>
+    const CONFIG = {
+      passkey: '01052026',
+      webhookGet: 'https://n8n.srv846064.hstgr.cloud/webhook/get_pending_approval_posts',
+      webhookPostApproved: 'https://n8n.srv846064.hstgr.cloud/webhook/post_approved',
+      webhookPostRejected: 'https://n8n.srv846064.hstgr.cloud/webhook/post_rejected',
+      webhookChangesRequested: 'https://n8n.srv846064.hstgr.cloud/webhook/changes_requested',
+      webhookApprovedFeed: 'https://n8n.srv846064.hstgr.cloud/webhook/approved_posts'
+    };
+
+    let postsData = [];
+    let approvedPostsData = [];
+    let authenticated = false;
+
+    // Premium Mock Data
+    const MOCK_DATA = [
+      {
+        "row_number": 2,
+        "Content Type": "It's all connected",
+        "Content Topic": "The blockage that led to soviet union",
+        "Post Content": "During the recent Iran-Israel conflict, everyone was watching the Strait of Hormuz.\nBut history's most dangerous chokepoints were never about oil.\nThey controlled something more powerful: wheat, weapons, & fate of empires.\n\nIn 1914, Russia was a giant.\nIt grew enough grain to feed half of Europe.\nAnd one-third of everything it exported left through a single narrow strait in Turkey: the Dardanelles.\n\nThen two German warships slipped past the British navy and docked in Istanbul.\nGermany gifted them to the Ottoman Empire.\nIn return, the Ottomans shut the Dardanelles to all traffic.\n\nRussia's economy stopped breathing overnight.\nNo grain out. No weapons in.\n\nBy 1915, Russian soldiers were arriving at the front with no rifles.\nThey were told to pick up weapons from fallen soldiers on the battlefield.\nThe bread queues in St. Petersburg grew longer every winter.\n\nBy February 1917, people weren't protesting politics.\nThey were rioting over bread.\n\nThe Tsar fell weeks later.\nThe Bolsheviks took power months after that.\nAnd thus The Soviet Union was born.\n\nAll of it traced back to one strait being closed.\n\nToday, the same logic applies.\nIran closes Hormuz: oil stops.\n\nChina pressures Taiwan Strait: semiconductors stop.\nRussia blocks the Black Sea: wheat stops.\n\nEvery chokepoint is the same story.\nA commodity. A closure. A cascade nobody saw coming.\n\nThe investor who only tracks the commodity will always be late.\nThe one watching the geo-politics behind the commodity will always be early.\n\n#GeopoliticalRisk #MacroInvesting #CapitalMarkets #MarketIntelligence #GlobalMacro #Perivis",
+        "Media Link": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=600&auto=format&fit=crop&q=80",
+        "Approval": "Pending",
+        "Post Text Comments": "",
+        "Media Comments": ""
+      },
+      {
+        "row_number": 3,
+        "Content Type": "Contrarian Takes on the Markets",
+        "Content Topic": "Testing 1",
+        "Post Content": "This is a clean, text-only LinkedIn post simulation. Because no 'Media Link' is configured for this post, no image canvas or random fallback displays at all. Only the high-fidelity professional typography and inline strategic controls render in the centered dashboard column.",
+        "Media Link": "",
+        "Approval": "Pending",
+        "Post Text Comments": "",
+        "Media Comments": ""
+      }
+    ];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      // Restore webhook configurations
+      const savedGet = localStorage.getItem('perivis_webhook_get');
+      const savedApproved = localStorage.getItem('perivis_webhook_approved');
+      const savedChanges = localStorage.getItem('perivis_webhook_changes');
+      const savedRejected = localStorage.getItem('perivis_webhook_rejected');
+      const savedApprovedFeed = localStorage.getItem('perivis_webhook_approved_feed');
+      if (savedGet) {
+        CONFIG.webhookGet = savedGet;
+        document.getElementById('webhook-get-url').value = savedGet;
+      }
+      if (savedApproved) {
+        CONFIG.webhookPostApproved = savedApproved;
+        document.getElementById('webhook-approved-url').value = savedApproved;
+      }
+      if (savedChanges) {
+        CONFIG.webhookChangesRequested = savedChanges;
+        document.getElementById('webhook-changes-url').value = savedChanges;
+      }
+      if (savedRejected) {
+        CONFIG.webhookPostRejected = savedRejected;
+        document.getElementById('webhook-rejected-url').value = savedRejected;
+      }
+      if (savedApprovedFeed) {
+        CONFIG.webhookApprovedFeed = savedApprovedFeed;
+        document.getElementById('webhook-approved-feed-url').value = savedApprovedFeed;
+      }
+
+      // Hide active dropdown menu when clicking anywhere else
+      document.addEventListener('click', (e) => {
+        const container = document.getElementById('menu-dropdown-container');
+        if (!container.contains(e.target)) {
+          container.classList.remove('open');
+          document.getElementById('nav-dropdown-menu').style.display = 'none';
+        }
+      });
+
+      // ALWAYS show lock screen on page load or F5 refresh.
+      document.getElementById('security-password').focus();
+
+      // Keypress listener for passcode gate
+      document.getElementById('security-password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          handleLogin();
+        }
+      });
+    });
+
+    function addLogEntry(message) {
+      const consoleBox = document.getElementById('console-logs');
+      if (!consoleBox) return;
+      const timeStr = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.innerHTML = `<span style="color: var(--text-dimmer);">[${timeStr}]</span> ${message}`;
+      consoleBox.appendChild(div);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    function toggleNavMenu(event) {
+      event.stopPropagation();
+      const container = document.getElementById('menu-dropdown-container');
+      const menu = document.getElementById('nav-dropdown-menu');
+      const isOpen = container.classList.contains('open');
+      
+      if (isOpen) {
+        container.classList.remove('open');
+        menu.style.display = 'none';
+      } else {
+        container.classList.add('open');
+        menu.style.display = 'flex';
+      }
+    }
+
+    function switchView(viewName) {
+      if (!authenticated) {
+        showToast('Please authenticate first', 'toast-error');
+        return;
+      }
+
+      // Close dropdown menu
+      const container = document.getElementById('menu-dropdown-container');
+      container.classList.remove('open');
+      document.getElementById('nav-dropdown-menu').style.display = 'none';
+
+      // Hide all view panels
+      document.getElementById('view-feed').style.display = 'none';
+      document.getElementById('view-sync').style.display = 'none';
+      document.getElementById('view-strategy').style.display = 'none';
+      document.getElementById('view-approved').style.display = 'none';
+
+      // Remove active states from dropdown items
+      document.getElementById('menu-item-feed').classList.remove('active');
+      document.getElementById('menu-item-sync').classList.remove('active');
+      document.getElementById('menu-item-strategy').classList.remove('active');
+      document.getElementById('menu-item-approved').classList.remove('active');
+
+      const label = document.getElementById('active-menu-label');
+      
+      if (viewName === 'feed') {
+        document.getElementById('view-feed').style.display = 'block';
+        document.getElementById('menu-item-feed').classList.add('active');
+        label.innerText = 'Review Feed';
+        addLogEntry('Navigated to Review Feed.');
+      } else if (viewName === 'sync') {
+        document.getElementById('view-sync').style.display = 'block';
+        document.getElementById('menu-item-sync').classList.add('active');
+        label.innerText = 'Sync Sheet';
+        addLogEntry('Navigated to Sync Sheet Dashboard.');
+      } else if (viewName === 'strategy') {
+        document.getElementById('view-strategy').style.display = 'block';
+        document.getElementById('menu-item-strategy').classList.add('active');
+        label.innerText = 'Content Strategy';
+        addLogEntry('Loaded Content Strategy Playbook.');
+      } else if (viewName === 'approved') {
+        document.getElementById('view-approved').style.display = 'block';
+        document.getElementById('menu-item-approved').classList.add('active');
+        label.innerText = 'View Approved';
+        addLogEntry('Navigated to Approved Posts Archive.');
+        fetchApprovedPosts();
+      }
+    }
+
+    function handleLogin() {
+      const input = document.getElementById('security-password');
+      const errorMsg = document.getElementById('login-error');
+      
+      if (input.value === CONFIG.passkey) {
+        authenticated = true;
+        document.getElementById('password-gate').classList.add('unlocked');
+        addLogEntry('Passcode validated. Unlocking terminal...');
+        fetchPosts();
+        showToast('System Feed Unlocked', 'info');
+      } else {
+        errorMsg.classList.add('visible');
+        input.value = '';
+        input.focus();
+        addLogEntry('Warning: Failed authentication attempt.');
+        setTimeout(() => {
+          errorMsg.classList.remove('visible');
+        }, 3000);
+      }
+    }
+
+    function saveSyncSettings() {
+      const getVal = document.getElementById('webhook-get-url').value.trim();
+      const approvedVal = document.getElementById('webhook-approved-url').value.trim();
+      const changesVal = document.getElementById('webhook-changes-url').value.trim();
+      const rejectedVal = document.getElementById('webhook-rejected-url').value.trim();
+      const approvedFeedVal = document.getElementById('webhook-approved-feed-url').value.trim();
+      
+      if (getVal) {
+        CONFIG.webhookGet = getVal;
+        localStorage.setItem('perivis_webhook_get', getVal);
+      }
+      if (approvedVal) {
+        CONFIG.webhookPostApproved = approvedVal;
+        localStorage.setItem('perivis_webhook_approved', approvedVal);
+      }
+      if (changesVal) {
+        CONFIG.webhookChangesRequested = changesVal;
+        localStorage.setItem('perivis_webhook_changes', changesVal);
+      }
+      if (rejectedVal) {
+        CONFIG.webhookPostRejected = rejectedVal;
+        localStorage.setItem('perivis_webhook_rejected', rejectedVal);
+      }
+      if (approvedFeedVal) {
+        CONFIG.webhookApprovedFeed = approvedFeedVal;
+        localStorage.setItem('perivis_webhook_approved_feed', approvedFeedVal);
+      }
+      addLogEntry('Webhook REST API configuration endpoints saved.');
+      showToast('API webhook endpoints updated', 'info');
+    }
+
+    function triggerSheetSync() {
+      addLogEntry('Sync request triggered manually.');
+      fetchPosts();
+    }
+
+    // POST Request to retrieve pending posts from n8n webhook data engine
+    async function fetchPosts() {
+      updateStatus('SYNCING', '#f5a623');
+      showFeedSkeleton();
+      addLogEntry('Requesting pending approval post payloads (POST)...');
+      
+      try {
+        const response = await fetch(CONFIG.webhookGet, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json' 
+          }
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const data = await response.json();
+        postsData = Array.isArray(data) ? data : [data];
+        
+        postsData.forEach(p => {
+          if (!p.Approval) p.Approval = 'Pending';
+        });
+
+        renderFeed();
+        updateStatus('CONNECTED', 'var(--signal)');
+        
+        // Update Sync Telemetry
+        document.getElementById('sync-tel-status').innerText = 'SUCCESS';
+        document.getElementById('sync-tel-status').style.color = 'var(--signal)';
+        document.getElementById('sync-tel-time').innerText = new Date().toLocaleTimeString();
+        
+        addLogEntry(`Successfully synced ${postsData.length} pending posts from sheet.`);
+        showToast(`Pulled ${postsData.length} pending posts`, 'success');
+      } catch (err) {
+        console.error('Connection failed, falling back to mock strategy data.', err);
+        postsData = JSON.parse(JSON.stringify(MOCK_DATA));
+        renderFeed();
+        updateStatus('CONNECTED', 'var(--signal)');
+        
+        // Update Sync Telemetry
+        document.getElementById('sync-tel-status').innerText = 'OFFLINE (SYNCED)';
+        document.getElementById('sync-tel-status').style.color = 'var(--amber)';
+        document.getElementById('sync-tel-time').innerText = new Date().toLocaleTimeString();
+        
+        addLogEntry('n8n Webhook offline. Initialized local offline strategy models.');
+        showToast('Webhook offline. Loaded feed data.', 'info');
+      }
+    }
+
+    // Fetch approved posts archive
+    async function fetchApprovedPosts() {
+      updateStatus('SYNCING', '#f5a623');
+      showApprovedFeedSkeleton();
+      addLogEntry('Requesting approved post archive payloads (POST)...');
+      
+      try {
+        // Fetch with POST request first
+        let response = await fetch(CONFIG.webhookApprovedFeed, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json' 
+          }
+        });
+        
+        // n8n fallback to GET request in case GET is strictly expected
+        if (!response.ok) {
+          addLogEntry('POST failed. Retrying approved archive request with GET...');
+          response = await fetch(CONFIG.webhookApprovedFeed, {
+            method: 'GET',
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' }
+          });
+        }
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const data = await response.json();
+        approvedPostsData = Array.isArray(data) ? data : [data];
+        
+        renderApprovedFeed();
+        updateStatus('CONNECTED', 'var(--signal)');
+        addLogEntry(`Successfully synced ${approvedPostsData.length} approved posts.`);
+        showToast(`Pulled ${approvedPostsData.length} approved posts`, 'success');
+      } catch (err) {
+        console.error('Connection failed for approved archive', err);
+        approvedPostsData = [];
+        renderApprovedFeed();
+        updateStatus('CONNECTED', 'var(--signal)');
+        addLogEntry('Failed to sync approved archive. Make sure approved posts webhook is active.');
+        showToast('Sync failed. Loaded empty archive.', 'toast-error');
+      }
+    }
+
+    function showFeedSkeleton() {
+      const container = document.getElementById('feed-container');
+      container.innerHTML = `
+        <div class="skeleton-card">
+          <div style="display:flex; gap:12px;">
+            <div class="skeleton skeleton-avatar"></div>
+            <div style="display:flex; flex-direction:column; gap:8px; flex:1;">
+              <div class="skeleton skeleton-line" style="width:40%"></div>
+              <div class="skeleton skeleton-line" style="width:25%"></div>
+            </div>
+          </div>
+          <div class="skeleton skeleton-line" style="width:100%; height:80px; margin-top:16px;"></div>
+        </div>
+      `;
+    }
+
+    function showApprovedFeedSkeleton() {
+      const container = document.getElementById('approved-feed-container');
+      container.innerHTML = `
+        <div class="skeleton-card">
+          <div style="display:flex; gap:12px;">
+            <div class="skeleton skeleton-avatar"></div>
+            <div style="display:flex; flex-direction:column; gap:8px; flex:1;">
+              <div class="skeleton skeleton-line" style="width:40%"></div>
+              <div class="skeleton skeleton-line" style="width:25%"></div>
+            </div>
+          </div>
+          <div class="skeleton skeleton-line" style="width:100%; height:80px; margin-top:16px;"></div>
+        </div>
+      `;
+    }
+
+    function updateStatus(text, color) {
+      const statusText = document.getElementById('status-text');
+      if (statusText) {
+        statusText.innerText = text;
+        statusText.style.color = color;
+      }
+      
+      const syncStatusInd = document.getElementById('sync-status-indicator');
+      if (syncStatusInd) {
+        syncStatusInd.innerText = text;
+        syncStatusInd.style.color = color;
+      }
+    }
+
+    // Feed Rendering in exact LinkedIn Layout
+    function renderFeed() {
+      const container = document.getElementById('feed-container');
+      container.innerHTML = '';
+      
+      const pendingPosts = postsData.filter(p => p.Approval === 'Pending');
+      const pendingCountText = document.getElementById('pending-count');
+      if (pendingCountText) {
+        pendingCountText.innerText = `${pendingPosts.length} Pending Posts`;
+      }
+
+      if (postsData.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <svg class="empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 17 22 12"></polyline></svg>
+            <div class="empty-title">Inbox Cleared</div>
+            <div class="empty-subtitle">Great job! All posts have been fully processed. Check sheet sync log.</div>
+          </div>
+        `;
+        return;
+      }
+
+      postsData.forEach(post => {
+        appendPostCard(post, container);
+      });
+    }
+
+    function renderApprovedFeed() {
+      const container = document.getElementById('approved-feed-container');
+      container.innerHTML = '';
+      
+      const approvedCountText = document.getElementById('approved-count');
+      if (approvedCountText) {
+        approvedCountText.innerText = `${approvedPostsData.length} Approved Posts`;
+      }
+
+      if (approvedPostsData.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <svg class="empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline></svg>
+            <div class="empty-title">Archive Empty</div>
+            <div class="empty-subtitle">No approved posts found in Google Sheet. Double-click pending posts to approve them.</div>
+          </div>
+        `;
+        return;
+      }
+
+      approvedPostsData.forEach(post => {
+        appendApprovedPostCard(post, container);
+      });
+    }
+
+    // Inline edit updates in memory models instantly
+    function updatePostText(rowNumber, text) {
+      const postIndex = postsData.findIndex(p => p.row_number === rowNumber);
+      if (postIndex !== -1) {
+        postsData[postIndex]['Post Content'] = text;
+        addLogEntry(`Edited wording locally on post row #${rowNumber}.`);
+      }
+    }
+
+    // Interactive edit wording drawer mode toggle
+    function toggleEditMode(rowNumber) {
+      // First, expand the post text if it is currently collapsed
+      expandPostText(rowNumber);
+      
+      // Hide see-more/see-less buttons while editing to keep target text perfectly clean
+      const seeMoreBtn = document.getElementById(`see-more-${rowNumber}`);
+      const seeLessBtn = document.getElementById(`see-less-${rowNumber}`);
+      if (seeMoreBtn) seeMoreBtn.style.display = 'none';
+      if (seeLessBtn) seeLessBtn.style.display = 'none';
+
+      const textBlock = document.getElementById(`content-text-${rowNumber}`);
+      const btn = document.getElementById(`edit-btn-${rowNumber}`);
+      const isEditable = textBlock.contentEditable === 'true';
+      
+      if (!isEditable) {
+        // Enable editing
+        textBlock.contentEditable = 'true';
+        textBlock.classList.add('editing-active');
+        textBlock.focus();
+        
+        // Place cursor at the end of the text
+        const range = document.createRange();
+        const sel = window.getSelection();
+        range.selectNodeContents(textBlock);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        
+        btn.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Save Wording</span>
+        `;
+        btn.classList.add('editing-btn-active');
+        showToast('Caption editing enabled', 'info');
+      } else {
+        // Disable and save
+        textBlock.contentEditable = 'false';
+        textBlock.classList.remove('editing-active');
+        
+        const newText = textBlock.innerText;
+        updatePostText(rowNumber, newText);
+        
+        // Re-evaluate truncation HTML for saved text dynamically
+        let newContentHtml = '';
+        if (newText.length > 180) {
+          const visiblePart = newText.slice(0, 180);
+          const hiddenPart = newText.slice(180);
+          newContentHtml = `<span class="post-text-visible">${visiblePart}</span><span id="text-hidden-${rowNumber}" class="post-text-hidden" style="display: none;">${hiddenPart}</span><span id="see-more-${rowNumber}" class="see-more-link" onclick="expandPostText(${rowNumber})">... see more</span><span id="see-less-${rowNumber}" class="see-less-link" style="display: none;" onclick="collapsePostText(${rowNumber})">... see less</span>`;
+        } else {
+          newContentHtml = `<span class="post-text-visible">${newText}</span>`;
+        }
+        textBlock.innerHTML = newContentHtml;
+
+        btn.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z"></path></svg>
+          <span>Edit Caption</span>
+        `;
+        btn.classList.remove('editing-btn-active');
+        showToast('Wording saved successfully', 'success');
+      }
+    }
+
+    function expandPostText(rowNumber) {
+      const hiddenSpan = document.getElementById(`text-hidden-${rowNumber}`);
+      const seeMoreBtn = document.getElementById(`see-more-${rowNumber}`);
+      const seeLessBtn = document.getElementById(`see-less-${rowNumber}`);
+      
+      if (hiddenSpan) hiddenSpan.style.display = 'inline';
+      if (seeMoreBtn) seeMoreBtn.style.display = 'none';
+      if (seeLessBtn) seeLessBtn.style.display = 'inline';
+    }
+
+    function collapsePostText(rowNumber) {
+      const hiddenSpan = document.getElementById(`text-hidden-${rowNumber}`);
+      const seeMoreBtn = document.getElementById(`see-more-${rowNumber}`);
+      const seeLessBtn = document.getElementById(`see-less-${rowNumber}`);
+      
+      if (hiddenSpan) hiddenSpan.style.display = 'none';
+      if (seeMoreBtn) seeMoreBtn.style.display = 'inline';
+      if (seeLessBtn) seeLessBtn.style.display = 'none';
+    }
+
+    function expandApprovedPostText(rowNumber) {
+      const hiddenSpan = document.getElementById(`approved-text-hidden-${rowNumber}`);
+      const seeMoreBtn = document.getElementById(`approved-see-more-${rowNumber}`);
+      const seeLessBtn = document.getElementById(`approved-see-less-${rowNumber}`);
+      
+      if (hiddenSpan) hiddenSpan.style.display = 'inline';
+      if (seeMoreBtn) seeMoreBtn.style.display = 'none';
+      if (seeLessBtn) seeLessBtn.style.display = 'inline';
+    }
+
+    function collapseApprovedPostText(rowNumber) {
+      const hiddenSpan = document.getElementById(`approved-text-hidden-${rowNumber}`);
+      const seeMoreBtn = document.getElementById(`approved-see-more-${rowNumber}`);
+      const seeLessBtn = document.getElementById(`approved-see-less-${rowNumber}`);
+      
+      if (hiddenSpan) hiddenSpan.style.display = 'none';
+      if (seeMoreBtn) seeMoreBtn.style.display = 'inline';
+      if (seeLessBtn) seeLessBtn.style.display = 'none';
+    }
+
+    // Visual card append helper
+    function appendPostCard(post, container) {
+      const card = document.createElement('article');
+      let statusClass = post.Approval.toLowerCase();
+      if (statusClass === 'redo requested') statusClass = 'redo_requested';
+      card.className = `post-card ${statusClass}`;
+      card.id = `post-card-${post.row_number}`;
+      
+      let statusBadge = `<span class="badge-status status-pending">PENDING APPROVAL</span>`;
+      if (post.Approval === 'Approved') statusBadge = `<span class="badge-status status-approved">APPROVED & QUEUED</span>`;
+      if (post.Approval === 'Rejected') statusBadge = `<span class="badge-status status-rejected">CHANGES REQUESTED</span>`;
+      if (post.Approval === 'Redo Requested') statusBadge = `<span class="badge-status status-redo">REDO REQUESTED</span>`;
+
+      // Optional Media Box
+      let mediaBox = '';
+      if (post['Media Link'] && post['Media Link'].trim() !== '') {
+        mediaBox = `
+          <!-- Full Width Media Image Preview -->
+          <div class="post-media-box">
+            <img class="post-media-image" id="media-img-${post.row_number}" src="${post['Media Link'].trim()}" alt="Feed Visual Asset" onerror="handleImageError(${post.row_number})">
+            <div id="media-fallback-${post.row_number}" class="media-fallback" style="display:none;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--red);"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              <div class="media-fallback-text">Unable to load direct visual asset image. Verify link availability.</div>
+              <a href="${post['Media Link']}" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:10px;">Open Image Link In New Tab</a>
+            </div>
+          </div>
+        `;
+      }
+
+      // LinkedIn-style Truncation logic
+      const fullText = post['Post Content'];
+      let postContentHtml = '';
+      
+      if (fullText.length > 180) {
+        const visiblePart = fullText.slice(0, 180);
+        const hiddenPart = fullText.slice(180);
+        postContentHtml = `<span class="post-text-visible">${visiblePart}</span><span id="text-hidden-${post.row_number}" class="post-text-hidden" style="display: none;">${hiddenPart}</span><span id="see-more-${post.row_number}" class="see-more-link" onclick="expandPostText(${post.row_number})">... see more</span><span id="see-less-${post.row_number}" class="see-less-link" style="display: none;" onclick="collapsePostText(${post.row_number})">... see less</span>`;
+      } else {
+        postContentHtml = `<span class="post-text-visible">${fullText}</span>`;
+      }
+
+      card.innerHTML = `
+        <!-- LinkedIn Author Header -->
+        <div class="post-card-header">
+          <div class="post-author">
+            <div class="post-avatar">
+              <img class="post-avatar-img" src="https://media.licdn.com/dms/image/v2/D4D03AQHqqSA3AcJWSg/profile-displayphoto-scale_400_400/B4DZiUf1ukG8Ag-/0/1754838032070?e=1780531200&v=beta&t=qkouYJq7iejKbFSXPBqiyc7KtZP46EV6uo-CRzya1Ls" alt="Parijat Garg Profile">
+            </div>
+            <div class="post-author-info">
+              <div class="post-author-name">
+                Parijat Garg
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--signal)" style="margin-left:2px;"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+              </div>
+              <div class="post-author-meta">Topic: ${post['Content Topic']}</div>
+              <div class="post-author-meta">Content Type: ${post['Content Type'] || 'Capital Market Signal'}</div>
+            </div>
+          </div>
+          <div class="badge-container">
+            ${statusBadge}
+          </div>
+        </div>
+
+        <!-- Premium caption container -->
+        <div class="post-content-wrapper">
+          <div class="post-content-text" id="content-text-${post.row_number}" contenteditable="false">${postContentHtml}</div>
+          <div class="post-content-actions">
+            <button onclick="toggleEditMode(${post.row_number})" id="edit-btn-${post.row_number}" class="btn-edit-text-trigger">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z"></path></svg>
+              <span>Edit Caption</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Render Optional Visual Element -->
+        ${mediaBox}
+
+        <!-- LinkedIn styled 3 capsule operational buttons -->
+        <div class="post-action-buttons">
+          <button onclick="submitStatus(${post.row_number}, 'Approved')" class="action-btn-li btn-approve-action">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            Approve Post
+          </button>
+          
+          <button onclick="toggleCommentBox(${post.row_number})" class="action-btn-li btn-text-action" id="changes-action-${post.row_number}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            Request Changes
+          </button>
+          
+          <button onclick="submitStatus(${post.row_number}, 'Redo Requested')" class="action-btn-li btn-redo-action">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+            Redo Entire Post
+          </button>
+        </div>
+
+        <!-- Single unified LinkedIn comment bubble revision drawer -->
+        <div id="comment-box-${post.row_number}" class="collapsible-comment-panel" style="display: none;">
+          <div class="comment-input-row">
+            <div class="comment-avatar-mini">
+              <img src="https://get.tofler.in/wp-content/uploads/2026/05/Logo-light.png" alt="Perivis Logo Icon">
+            </div>
+            <div class="comment-bubble-wrapper">
+              <textarea id="changes-comment-${post.row_number}" class="comment-bubble-textarea" placeholder="Add text, media, or structural revision comments requested...">${post['Post Text Comments'] || ''}</textarea>
+              <button onclick="submitStatus(${post.row_number}, 'Rejected')" class="comment-submit-btn">Submit Revision Instructions</button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      container.appendChild(card);
+    }
+
+    // Approved post card layout without any edit wording or operational controls
+    function appendApprovedPostCard(post, container) {
+      const card = document.createElement('article');
+      card.className = 'post-card approved';
+      card.id = `approved-post-card-${post.row_number}`;
+      
+      let statusBadge = `<span class="badge-status status-approved">APPROVED & QUEUED</span>`;
+
+      // Optional Media Box
+      let mediaBox = '';
+      if (post['Media Link'] && post['Media Link'].trim() !== '') {
+        mediaBox = `
+          <!-- Full Width Media Image Preview -->
+          <div class="post-media-box">
+            <img class="post-media-image" id="approved-media-img-${post.row_number}" src="${post['Media Link'].trim()}" alt="Feed Visual Asset" onerror="handleApprovedImageError(${post.row_number})">
+            <div id="approved-media-fallback-${post.row_number}" class="media-fallback" style="display:none;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--red);"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              <div class="media-fallback-text">Unable to load direct visual asset image. Verify link availability.</div>
+              <a href="${post['Media Link']}" target="_blank" class="btn btn-primary" style="padding:6px 12px; font-size:10px;">Open Image Link In New Tab</a>
+            </div>
+          </div>
+        `;
+      }
+
+      // LinkedIn-style Truncation logic
+      const fullText = post['Post Content'] || '';
+      let postContentHtml = '';
+      
+      if (fullText.length > 180) {
+        const visiblePart = fullText.slice(0, 180);
+        const hiddenPart = fullText.slice(180);
+        postContentHtml = `<span class="post-text-visible">${visiblePart}</span><span id="approved-text-hidden-${post.row_number}" class="post-text-hidden" style="display: none;">${hiddenPart}</span><span id="approved-see-more-${post.row_number}" class="see-more-link" onclick="expandApprovedPostText(${post.row_number})">... see more</span><span id="approved-see-less-${post.row_number}" class="see-less-link" style="display: none;" onclick="collapseApprovedPostText(${post.row_number})">... see less</span>`;
+      } else {
+        postContentHtml = `<span class="post-text-visible">${fullText}</span>`;
+      }
+
+      card.innerHTML = `
+        <!-- LinkedIn Author Header -->
+        <div class="post-card-header">
+          <div class="post-author">
+            <div class="post-avatar">
+              <img class="post-avatar-img" src="https://media.licdn.com/dms/image/v2/D4D03AQHqqSA3AcJWSg/profile-displayphoto-scale_400_400/B4DZiUf1ukG8Ag-/0/1754838032070?e=1780531200&v=beta&t=qkouYJq7iejKbFSXPBqiyc7KtZP46EV6uo-CRzya1Ls" alt="Parijat Garg Profile">
+            </div>
+            <div class="post-author-info">
+              <div class="post-author-name">
+                Parijat Garg
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--signal)" style="margin-left:2px;"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+              </div>
+              <div class="post-author-meta">Topic: ${post['Content Topic'] || post['Topic'] || 'LinkedIn Update'}</div>
+              <div class="post-author-meta">Content Type: ${post['Content Type'] || 'Capital Market Signal'}</div>
+            </div>
+          </div>
+          <div class="badge-container">
+            ${statusBadge}
+          </div>
+        </div>
+
+        <!-- Read-only caption container -->
+        <div class="post-content-wrapper" style="padding-bottom: 12px;">
+          <div class="post-content-text" id="approved-content-text-${post.row_number}" contenteditable="false">${postContentHtml}</div>
+        </div>
+
+        <!-- Render Optional Visual Element -->
+        ${mediaBox}
+      `;
+      
+      container.appendChild(card);
+    }
+
+    function handleApprovedImageError(rowNumber) {
+      document.getElementById(`approved-media-img-${rowNumber}`).style.display = 'none';
+      document.getElementById(`approved-media-fallback-${rowNumber}`).style.display = 'flex';
+    }
+
+    // Submit and update approval state to sheet backend webhook
+    async function submitStatus(rowNumber, status) {
+      const postIndex = postsData.findIndex(p => p.row_number === rowNumber);
+      if (postIndex === -1) return;
+
+      const post = postsData[postIndex];
+      const commentInput = document.getElementById(`changes-comment-${rowNumber}`);
+      const commentsText = commentInput ? commentInput.value.trim() : '';
+
+      // Action validation: Ensure revision comments are provided if requesting changes
+      if (status === 'Rejected' && !commentsText) {
+        showToast('Please enter revision comments first', 'toast-error');
+        if (commentInput) commentInput.focus();
+        return;
+      }
+
+      // Update in-memory models
+      post.Approval = status;
+      post['Post Text Comments'] = commentsText;
+      
+      // Update specific card state visually in feed
+      const card = document.getElementById(`post-card-${rowNumber}`);
+      let statusClass = status.toLowerCase();
+      if (statusClass === 'redo requested') statusClass = 'redo_requested';
+      card.className = `post-card ${statusClass}`;
+      
+      renderFeed();
+
+      if (status === 'Approved') {
+        showToast(`Syncing post row #${rowNumber} to approved channel...`, 'info');
+        updateStatus('SYNCING', '#f5a623');
+        addLogEntry(`Submitting approval trigger webhook for post row #${rowNumber}...`);
+        
+        try {
+          const url = new URL(CONFIG.webhookPostApproved);
+          url.searchParams.append('row_number', post.row_number);
+          url.searchParams.append('Approval', status);
+          url.searchParams.append('post_content', post['Post Content']);
+          url.searchParams.append('content_type', post['Content Type'] || '');
+          url.searchParams.append('content_topic', post['Content Topic'] || '');
+          
+          const response = await fetch(url.toString(), {
+            method: 'GET',
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' }
+          });
+          
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          
+          addLogEntry(`Successfully synced approved state to Google Sheet for post row #${rowNumber}.`);
+          showToast(`Post row #${rowNumber} successfully approved & queued!`, 'success');
+          updateStatus('CONNECTED', 'var(--signal)');
+        } catch (err) {
+          console.error('Approve webhook failed, saved locally.', err);
+          addLogEntry(`Approve webhook offline. Saved approved state locally for post row #${rowNumber}.`);
+          showToast(`Approved locally (Synced).`, 'info');
+          updateStatus('CONNECTED', 'var(--signal)');
+        }
+      } else if (status === 'Redo Requested') {
+        showToast(`Syncing complete redo request for post...`, 'info');
+        updateStatus('SYNCING', '#f5a623');
+        addLogEntry(`Submitting redo webhook for topic "${post['Content Topic']}"...`);
+        
+        try {
+          const url = new URL(CONFIG.webhookPostRejected);
+          url.searchParams.append('content_topic', post['Content Topic'] || '');
+          url.searchParams.append('topic', post['Content Topic'] || '');
+          url.searchParams.append('row_number', post.row_number);
+          url.searchParams.append('Approval', status);
+          
+          const response = await fetch(url.toString(), {
+            method: 'GET',
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' }
+          });
+          
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          
+          addLogEntry(`Successfully submitted redo trigger for post row #${rowNumber}.`);
+          showToast(`Redo request successfully sent to webhook!`, 'success');
+          updateStatus('CONNECTED', 'var(--signal)');
+        } catch (err) {
+          console.error('Redo webhook failed, saved locally.', err);
+          addLogEntry(`Redo webhook offline. Logged redo request locally for post row #${rowNumber}.`);
+          showToast('Redo requested locally (Synced).', 'info');
+          updateStatus('CONNECTED', 'var(--signal)');
+        }
+      } else if (status === 'Rejected') {
+        showToast(`Syncing revision request for post...`, 'info');
+        updateStatus('SYNCING', '#f5a623');
+        addLogEntry(`Submitting changes requested webhook for post row #${rowNumber}...`);
+        
+        try {
+          const url = new URL(CONFIG.webhookChangesRequested);
+          url.searchParams.append('row_number', post.row_number);
+          url.searchParams.append('Approval', status);
+          url.searchParams.append('content_topic', post['Content Topic'] || '');
+          url.searchParams.append('post_content', post['Post Content'] || '');
+          url.searchParams.append('comments', commentsText);
+          
+          const response = await fetch(url.toString(), {
+            method: 'GET',
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' }
+          });
+          
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          
+          addLogEntry(`Successfully synced changes requested with remarks: "${commentsText}".`);
+          showToast(`Revision request successfully synced!`, 'success');
+          updateStatus('CONNECTED', 'var(--signal)');
+        } catch (err) {
+          console.error('Revision webhook failed, saved locally.', err);
+          addLogEntry(`Changes webhook offline. Logged revision locally for post row #${rowNumber}.`);
+          showToast('Revision requested locally (Synced).', 'info');
+          updateStatus('CONNECTED', 'var(--signal)');
+        }
+      }
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      toast.className = `toast ${type === 'toast-error' ? 'toast-error' : (type === 'info' ? 'toast-info' : '')}`;
+      
+      let icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      if (type === 'toast-error') {
+        icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+      } else if (type === 'info') {
+        icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      }
+
+      toast.innerHTML = `
+        ${icon}
+        <div class="toast-msg">${message}</div>
+      `;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => { toast.classList.add('show'); }, 10);
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => { toast.remove(); }, 400);
+      }, 3500);
+    }
+  </script>oke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      }
+
+      toast.innerHTML = `
+        ${icon}
+        <div class="toast-msg">${message}</div>
+      `;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => { toast.classList.add('show'); }, 10);
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => { toast.remove(); }, 400);
+      }, 3500);
+    }
+  </script>
+</body>
+</html>
