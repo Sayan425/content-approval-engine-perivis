@@ -3119,11 +3119,11 @@
         updateStatus('CONNECTED', 'var(--signal)');
         
         // Update Sync Telemetry
-        document.getElementById('sync-tel-status').innerText = 'OFFLINE (SYNCED)';
-        document.getElementById('sync-tel-status').style.color = 'var(--amber)';
+        document.getElementById('sync-tel-status').innerText = 'ERROR';
+        document.getElementById('sync-tel-status').style.color = 'var(--red)';
         document.getElementById('sync-tel-time').innerText = new Date().toLocaleTimeString();
         
-        addLogEntry('n8n Webhook offline. Initialized local offline strategy models.');
+        addLogEntry(`<span style="color: var(--red);">Sync failed: ${err.message || err}</span>`);
         showToast('Webhook offline. Loaded feed data.', 'info');
       }
     }
@@ -3157,7 +3157,7 @@
         approvedPostsData = [];
         renderApprovedFeed();
         updateStatus('CONNECTED', 'var(--signal)');
-        addLogEntry('Failed to sync approved archive. Make sure approved posts webhook is active.');
+        addLogEntry(`<span style="color: var(--red);">Sync failed: ${err.message || err}</span>`);
         showToast('Sync failed. Loaded empty archive.', 'toast-error');
       }
     }
@@ -3679,6 +3679,7 @@
 
     function showToast(message, type = 'success') {
       const container = document.getElementById('toast-container');
+      if (!container) return;
       const toast = document.createElement('div');
       
       toast.className = `toast ${type === 'toast-error' ? 'toast-error' : (type === 'info' ? 'toast-info' : '')}`;
@@ -3688,23 +3689,6 @@
         icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
       } else if (type === 'info') {
         icon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
-      }
-
-      toast.innerHTML = `
-        ${icon}
-        <div class="toast-msg">${message}</div>
-      `;
-      
-      container.appendChild(toast);
-      
-      setTimeout(() => { toast.classList.add('show'); }, 10);
-      
-      setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => { toast.remove(); }, 400);
-      }, 3500);
-    }
-  </script>oke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
       }
 
       toast.innerHTML = `
