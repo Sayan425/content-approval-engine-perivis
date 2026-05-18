@@ -2050,7 +2050,7 @@
         <div style="font-family: var(--mono); font-size: 9px; color: var(--text-dimmer); text-transform: uppercase; margin-bottom: 16px; letter-spacing: 1px; text-align: left;">Engine API Endpoints</div>
         <div class="settings-grid">
           <div class="settings-input-group">
-            <label class="form-label">Data Fetch Webhook (POST)</label>
+            <label class="form-label">Data Fetch Webhook (GET)</label>
             <input type="text" id="webhook-get-url" class="settings-input" value="https://n8n.srv846064.hstgr.cloud/webhook/get_pending_approval_posts" onchange="saveSyncSettings()">
           </div>
           <div class="settings-input-group">
@@ -2066,7 +2066,7 @@
             <input type="text" id="webhook-rejected-url" class="settings-input" value="https://n8n.srv846064.hstgr.cloud/webhook/post_rejected" onchange="saveSyncSettings()">
           </div>
           <div class="settings-input-group">
-            <label class="form-label">Live Approved Posts Archive Webhook (POST)</label>
+            <label class="form-label">Live Approved Posts Archive Webhook (GET)</label>
             <input type="text" id="webhook-approved-feed-url" class="settings-input" value="https://n8n.srv846064.hstgr.cloud/webhook/approved_posts" onchange="saveSyncSettings()">
           </div>
         </div>
@@ -3048,18 +3048,17 @@
       fetchPosts();
     }
 
-    // POST Request to retrieve pending posts from n8n webhook data engine
+    // GET Request to retrieve pending posts from n8n webhook data engine
     async function fetchPosts() {
       updateStatus('SYNCING', '#f5a623');
       showFeedSkeleton();
-      addLogEntry('Requesting pending approval post payloads (POST)...');
+      addLogEntry('Requesting pending approval post payloads (GET)...');
       
       try {
         const response = await fetch(CONFIG.webhookGet, {
-          method: 'POST',
+          method: 'GET',
           mode: 'cors',
           headers: { 
-            'Content-Type': 'application/json',
             'Accept': 'application/json' 
           }
         });
@@ -3103,28 +3102,16 @@
     async function fetchApprovedPosts() {
       updateStatus('SYNCING', '#f5a623');
       showApprovedFeedSkeleton();
-      addLogEntry('Requesting approved post archive payloads (POST)...');
+      addLogEntry('Requesting approved post archive payloads (GET)...');
       
       try {
-        // Fetch with POST request first
-        let response = await fetch(CONFIG.webhookApprovedFeed, {
-          method: 'POST',
+        const response = await fetch(CONFIG.webhookApprovedFeed, {
+          method: 'GET',
           mode: 'cors',
           headers: { 
-            'Content-Type': 'application/json',
             'Accept': 'application/json' 
           }
         });
-        
-        // n8n fallback to GET request in case GET is strictly expected
-        if (!response.ok) {
-          addLogEntry('POST failed. Retrying approved archive request with GET...');
-          response = await fetch(CONFIG.webhookApprovedFeed, {
-            method: 'GET',
-            mode: 'cors',
-            headers: { 'Accept': 'application/json' }
-          });
-        }
         
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
