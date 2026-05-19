@@ -475,8 +475,23 @@
       flex-direction: column;
       position: relative;
       overflow: hidden;
-      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.4s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.4s ease, margin 0.4s ease, padding 0.4s ease;
       width: 100%;
+      max-height: 1500px;
+    }
+
+    .post-card.fade-out {
+      opacity: 0;
+      transform: scale(0.92) translateY(-30px);
+      max-height: 0 !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      border-width: 0 !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      pointer-events: none;
     }
 
     .post-card.approved {
@@ -2853,28 +2868,7 @@
     let authenticated = false;
 
     // Premium Mock Data
-    const MOCK_DATA = [
-      {
-        "row_number": 2,
-        "Content Type": "It's all connected",
-        "Content Topic": "The blockage that led to soviet union",
-        "Post Content": "During the recent Iran-Israel conflict, everyone was watching the Strait of Hormuz.\nBut history's most dangerous chokepoints were never about oil.\nThey controlled something more powerful: wheat, weapons, & fate of empires.\n\nIn 1914, Russia was a giant.\nIt grew enough grain to feed half of Europe.\nAnd one-third of everything it exported left through a single narrow strait in Turkey: the Dardanelles.\n\nThen two German warships slipped past the British navy and docked in Istanbul.\nGermany gifted them to the Ottoman Empire.\nIn return, the Ottomans shut the Dardanelles to all traffic.\n\nRussia's economy stopped breathing overnight.\nNo grain out. No weapons in.\n\nBy 1915, Russian soldiers were arriving at the front with no rifles.\nThey were told to pick up weapons from fallen soldiers on the battlefield.\nThe bread queues in St. Petersburg grew longer every winter.\n\nBy February 1917, people weren't protesting politics.\nThey were rioting over bread.\n\nThe Tsar fell weeks later.\nThe Bolsheviks took power months after that.\nAnd thus The Soviet Union was born.\n\nAll of it traced back to one strait being closed.\n\nToday, the same logic applies.\nIran closes Hormuz: oil stops.\n\nChina pressures Taiwan Strait: semiconductors stop.\nRussia blocks the Black Sea: wheat stops.\n\nEvery chokepoint is the same story.\nA commodity. A closure. A cascade nobody saw coming.\n\nThe investor who only tracks the commodity will always be late.\nThe one watching the geo-politics behind the commodity will always be early.\n\n#GeopoliticalRisk #MacroInvesting #CapitalMarkets #MarketIntelligence #GlobalMacro #Perivis",
-        "Media Link": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=600&auto=format&fit=crop&q=80",
-        "Approval": "Pending",
-        "Post Text Comments": "",
-        "Media Comments": ""
-      },
-      {
-        "row_number": 3,
-        "Content Type": "Contrarian Takes on the Markets",
-        "Content Topic": "Testing 1",
-        "Post Content": "This is a clean, text-only LinkedIn post simulation. Because no 'Media Link' is configured for this post, no image canvas or random fallback displays at all. Only the high-fidelity professional typography and inline strategic controls render in the centered dashboard column.",
-        "Media Link": "",
-        "Approval": "Pending",
-        "Post Text Comments": "",
-        "Media Comments": ""
-      }
-    ];
+    const MOCK_DATA = [];
 
     window.addEventListener('DOMContentLoaded', () => {
       // Restore webhook configurations
@@ -3192,35 +3186,78 @@
         totalPages: 0,
         url: url,
         isApproved: isApproved,
-        rendering: false
+        rendering: false,
+        useIframeFallback: false
       };
 
       try {
-        // Load the PDF document using CORS-friendly streaming
-        const loadingTask = pdfjsLib.getDocument({
-          url: url,
-          withCredentials: false
-        });
-        const pdf = await loadingTask.promise;
+        let pdf = null;
+        console.log(`[PDF Engine] Row #${rowNumber}: Initiating high-fidelity PDF loading...`);
         
+        try {
+          // 1. Direct CORS Load
+          const loadingTask = pdfjsLib.getDocument({
+            url: url,
+            withCredentials: false
+          });
+          pdf = await loadingTask.promise;
+          console.log(`[PDF Engine] Row #${rowNumber}: Direct load succeeded.`);
+        } catch (directErr) {
+          console.warn(`[PDF Engine] Direct load failed. Retrying via Premium CORSProxy.io binary buffer fetch...`);
+          
+          try {
+            // 2. Premium CORSProxy.io raw ArrayBuffer fetch (highly reliable, instant response)
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error(`CORSProxy.io status: ${response.status}`);
+            const arrayBuffer = await response.arrayBuffer();
+            
+            const loadingTask = pdfjsLib.getDocument({
+              data: new Uint8Array(arrayBuffer)
+            });
+            pdf = await loadingTask.promise;
+            console.log(`[PDF Engine] Row #${rowNumber}: CORSProxy.io buffer load succeeded.`);
+          } catch (proxyErr1) {
+            console.warn(`[PDF Engine] CORSProxy.io failed. Falling back to AllOrigins raw buffer fetch...`);
+            
+            try {
+              // 3. Backup AllOrigins raw ArrayBuffer fetch
+              const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+              const response = await fetch(proxyUrl);
+              if (!response.ok) throw new Error(`AllOrigins status: ${response.status}`);
+              const arrayBuffer = await response.arrayBuffer();
+              
+              const loadingTask = pdfjsLib.getDocument({
+                data: new Uint8Array(arrayBuffer)
+              });
+              pdf = await loadingTask.promise;
+              console.log(`[PDF Engine] Row #${rowNumber}: AllOrigins backup buffer load succeeded.`);
+            } catch (proxyErr2) {
+              throw new Error(`All loading strategies (direct and proxied buffer streams) failed for this domain.`);
+            }
+          }
+        }
+
         pdfDocs[key].doc = pdf;
         pdfDocs[key].totalPages = pdf.numPages;
         
         // Hide loader
         if (loader) loader.style.display = 'none';
         
-        // Render the first page
+        // Render the first page on canvas beautifully
         await renderPdfPage(rowNumber, 1, isApproved);
         
       } catch (err) {
-        console.error('PDF.js failed to load document:', err);
-        if (loader) {
-          loader.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" style="margin-bottom:6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-            <span style="color: var(--red); font-size:10px; text-align:center; padding: 0 24px;">Unable to display PDF slide deck preview directly.</span>
-            <a href="${url}" target="_blank" class="btn btn-primary" style="margin-top: 8px; padding: 4px 8px; font-size: 9px; text-transform:uppercase; letter-spacing:0.5px;">Download Document</a>
-          `;
-        }
+        console.warn(`[PDF Engine] Browser CORS / Firewall block. Silently activating CORS-Immune Iframe Slide deck player for post #${rowNumber}...`);
+        
+        // Mark as iframe fallback player
+        pdfDocs[key].useIframeFallback = true;
+        
+        // Hide loader
+        if (loader) loader.style.display = 'none';
+        
+        // Render via iframe page hash
+        await renderPdfPage(rowNumber, 1, isApproved);
       }
     }
 
@@ -3228,62 +3265,110 @@
       const prefix = isApproved ? 'approved-' : '';
       const key = `${prefix}${rowNumber}`;
       const state = pdfDocs[key];
-      if (!state || !state.doc || state.rendering) return;
+      if (!state || state.rendering) return;
 
       state.rendering = true;
       state.currentPage = pageNum;
 
       try {
-        const page = await state.doc.getPage(pageNum);
         const canvas = document.getElementById(`${prefix}pdf-canvas-${rowNumber}`);
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-
-        // Render scale designed for premium display high-fidelity detail
-        const viewport = page.getViewport({ scale: 1.5 });
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-
-        const renderContext = {
-          canvasContext: ctx,
-          viewport: viewport
-        };
-        
-        await page.render(renderContext).promise;
-        canvas.style.opacity = '1';
-
-        // Update indicator
-        const pageIndicator = document.getElementById(`${prefix}pdf-page-indicator-${rowNumber}`);
-        if (pageIndicator) {
-          pageIndicator.innerText = `${pageNum} / ${state.totalPages} Pages`;
-        }
-
-        // Update navigation buttons status
         const prevBtn = document.getElementById(`${prefix}pdf-prev-${rowNumber}`);
         const nextBtn = document.getElementById(`${prefix}pdf-next-${rowNumber}`);
-        
-        if (prevBtn) {
-          if (pageNum > 1) {
-            prevBtn.style.opacity = '1';
-            prevBtn.style.pointerEvents = 'auto';
-          } else {
-            prevBtn.style.opacity = '0.15';
-            prevBtn.style.pointerEvents = 'none';
+        const pageIndicator = document.getElementById(`${prefix}pdf-page-indicator-${rowNumber}`);
+
+        if (state.useIframeFallback) {
+          // CORS-Immune Iframe Fallback Player Mode
+          let iframe = document.getElementById(`${prefix}pdf-iframe-${rowNumber}`);
+          if (!iframe) {
+            // Hide canvas completely
+            if (canvas) canvas.style.display = 'none';
+            
+            // Create full-width dynamic iframe
+            iframe = document.createElement('iframe');
+            iframe.id = `${prefix}pdf-iframe-${rowNumber}`;
+            iframe.style.width = '100%';
+            iframe.style.height = '480px';
+            iframe.style.border = 'none';
+            iframe.style.background = '#0b0f14';
+            iframe.allow = 'autoplay';
+            
+            // Insert inside container
+            canvas.parentNode.insertBefore(iframe, canvas);
           }
-        }
-        
-        if (nextBtn) {
-          if (pageNum < state.totalPages) {
+          
+          // Render target page using standard hash navigation parameters (instantly jumps to page without reloading file)
+          iframe.src = `${state.url}#page=${pageNum}&toolbar=0&navpanes=0&messages=0`;
+          
+          // Update details indicator
+          if (pageIndicator) {
+            pageIndicator.innerText = `Page ${pageNum}`;
+          }
+
+          // Left nav button activated when slide index > 1
+          if (prevBtn) {
+            if (pageNum > 1) {
+              prevBtn.style.opacity = '1';
+              prevBtn.style.pointerEvents = 'auto';
+            } else {
+              prevBtn.style.opacity = '0.15';
+              prevBtn.style.pointerEvents = 'none';
+            }
+          }
+          
+          // Next nav button always active in fallback (since cross-origin iframe page count is secure)
+          if (nextBtn) {
             nextBtn.style.opacity = '1';
             nextBtn.style.pointerEvents = 'auto';
-          } else {
-            nextBtn.style.opacity = '0.15';
-            nextBtn.style.pointerEvents = 'none';
+          }
+          
+        } else {
+          // Standard High-Fidelity PDF.js Canvas Rendering
+          const page = await state.doc.getPage(pageNum);
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+
+          // Render scale designed for premium display high-fidelity detail
+          const viewport = page.getViewport({ scale: 1.5 });
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          const renderContext = {
+            canvasContext: ctx,
+            viewport: viewport
+          };
+          
+          await page.render(renderContext).promise;
+          canvas.style.opacity = '1';
+
+          // Update indicator
+          if (pageIndicator) {
+            pageIndicator.innerText = `${pageNum} / ${state.totalPages} Pages`;
+          }
+
+          // Update navigation buttons status
+          if (prevBtn) {
+            if (pageNum > 1) {
+              prevBtn.style.opacity = '1';
+              prevBtn.style.pointerEvents = 'auto';
+            } else {
+              prevBtn.style.opacity = '0.15';
+              prevBtn.style.pointerEvents = 'none';
+            }
+          }
+          
+          if (nextBtn) {
+            if (pageNum < state.totalPages) {
+              nextBtn.style.opacity = '1';
+              nextBtn.style.pointerEvents = 'auto';
+            } else {
+              nextBtn.style.opacity = '0.15';
+              nextBtn.style.pointerEvents = 'none';
+            }
           }
         }
 
       } catch (err) {
-        console.error('Error rendering PDF page:', err);
+        console.error('[PDF Engine] Error rendering page:', err);
       } finally {
         state.rendering = false;
       }
@@ -3293,11 +3378,18 @@
       const prefix = isApproved ? 'approved-' : '';
       const key = `${prefix}${rowNumber}`;
       const state = pdfDocs[key];
-      if (!state || !state.doc) return;
+      if (!state) return;
 
       const newPage = state.currentPage + delta;
-      if (newPage >= 1 && newPage <= state.totalPages) {
-        renderPdfPage(rowNumber, newPage, isApproved);
+      
+      if (state.useIframeFallback) {
+        if (newPage >= 1) {
+          renderPdfPage(rowNumber, newPage, isApproved);
+        }
+      } else {
+        if (state.doc && newPage >= 1 && newPage <= state.totalPages) {
+          renderPdfPage(rowNumber, newPage, isApproved);
+        }
       }
     }
 
@@ -3358,12 +3450,12 @@
         pendingCountText.innerText = `${pendingPosts.length} Pending Posts`;
       }
 
-      if (postsData.length === 0) {
+      if (postsData.length === 0 || pendingPosts.length === 0) {
         container.innerHTML = `
           <div class="empty-state">
             <svg class="empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 17 22 12"></polyline></svg>
             <div class="empty-title">Inbox Cleared</div>
-            <div class="empty-subtitle">Great job! All posts have been fully processed. Check sheet sync log.</div>
+            <div class="empty-subtitle">There are no current pending posts. Please ask the Content team to add more posts for approval.</div>
           </div>
         `;
         return;
@@ -3523,6 +3615,23 @@
       if (seeLessBtn) seeLessBtn.style.display = 'none';
     }
 
+    function toggleCommentBox(rowNumber) {
+      const box = document.getElementById(`comment-box-${rowNumber}`);
+      const btn = document.getElementById(`changes-action-${rowNumber}`);
+      if (!box) return;
+      
+      const isHidden = box.style.display === 'none';
+      if (isHidden) {
+        box.style.display = 'block';
+        if (btn) btn.classList.add('active-action');
+        const textarea = document.getElementById(`changes-comment-${rowNumber}`);
+        if (textarea) textarea.focus();
+      } else {
+        box.style.display = 'none';
+        if (btn) btn.classList.remove('active-action');
+      }
+    }
+
     function expandApprovedPostText(rowNumber) {
       const hiddenSpan = document.getElementById(`approved-text-hidden-${rowNumber}`);
       const seeMoreBtn = document.getElementById(`approved-see-more-${rowNumber}`);
@@ -3584,38 +3693,41 @@
           
           mediaBox = `
             <!-- LinkedIn-Style High-Fidelity PDF Carousel Viewer (Page-by-Page Slider) -->
-            <div class="post-media-box pdf-viewer-container" style="background: #0f131a; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin: 12px 0 4px 0;">
-              <div class="pdf-viewer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border2);">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">${fileName}</span>
-                  <span class="pdf-page-indicator" id="pdf-page-indicator-${post.row_number}" style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); background: var(--surface3); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border);">Loading...</span>
-                </div>
-                <a href="${mediaUrl}" target="_blank" class="btn-open-pdf" style="display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--signal); text-decoration: none; border: 1px solid var(--signal-dim); padding: 4px 8px; border-radius: 4px; background: var(--signal-dim); transition: all 0.2s;">
-                  <span>Open PDF</span>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                </a>
-              </div>
+            <div class="pdf-viewer-container" style="display: flex; flex-direction: column; width: 100%; background: #0f131a; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin: 12px 0 4px 0;">
               
-              <div class="pdf-canvas-container" style="position: relative; width: 100%; min-height: 380px; background: #0f131a; display: flex; align-items: center; justify-content: center; overflow: hidden; user-select: none;">
+              <!-- Slide Canvas Area -->
+              <div class="pdf-canvas-container" style="position: relative; width: 100%; min-height: 420px; background: #0b0f14; display: flex; align-items: center; justify-content: center; overflow: hidden; user-select: none;">
                 <!-- Loading spinner -->
-                <div class="pdf-loader" id="pdf-loader-${post.row_number}" style="position: absolute; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--text-dim); font-size: 11px; font-family: var(--mono);">
-                  <div class="loader-spinner" style="width: 24px; height: 24px; border: 2px solid var(--border2); border-top-color: var(--signal); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <div class="pdf-loader" id="pdf-loader-${post.row_number}" style="position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-dim); font-size: 11px; font-family: var(--mono); width: 100%; text-align: center; padding: 24px;">
+                  <div class="loader-spinner" style="width: 28px; height: 28px; border: 2px solid var(--border2); border-top-color: var(--signal); border-radius: 50%; animation: spin 1s linear infinite;"></div>
                   <span>Loading Slide Deck...</span>
                 </div>
                 
                 <!-- Left Navigation Arrow -->
-                <button class="pdf-nav-btn pdf-prev-btn" id="pdf-prev-${post.row_number}" onclick="changePdfPage(${post.row_number}, -1, false)" style="position: absolute; left: 12px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(18, 23, 31, 0.85); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.2; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <button class="pdf-nav-btn pdf-prev-btn" id="pdf-prev-${post.row_number}" onclick="changePdfPage(${post.row_number}, -1, false)" style="position: absolute; left: 16px; z-index: 10; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(11, 15, 20, 0.9); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.15; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.6);">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
                 </button>
                 
                 <!-- Canvas for Page Rendering -->
-                <canvas class="pdf-render-canvas" id="pdf-canvas-${post.row_number}" style="max-width: 100%; max-height: 480px; display: block; object-fit: contain; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s;"></canvas>
+                <canvas class="pdf-render-canvas" id="pdf-canvas-${post.row_number}" style="max-width: 100%; max-height: 520px; display: block; object-fit: contain; box-shadow: 0 4px 16px rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.3s;"></canvas>
                 
                 <!-- Right Navigation Arrow -->
-                <button class="pdf-nav-btn pdf-next-btn" id="pdf-next-${post.row_number}" onclick="changePdfPage(${post.row_number}, 1, false)" style="position: absolute; right: 12px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(18, 23, 31, 0.85); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.2; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                <button class="pdf-nav-btn pdf-next-btn" id="pdf-next-${post.row_number}" onclick="changePdfPage(${post.row_number}, 1, false)" style="position: absolute; right: 16px; z-index: 10; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(11, 15, 20, 0.9); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.15; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.6);">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </button>
+              </div>
+
+              <!-- Footer Details Bar at bottom -->
+              <div class="pdf-viewer-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--surface2); border-top: 1px solid var(--border2);">
+                <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 70%;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2" style="flex-shrink: 0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis;">${fileName}</span>
+                  <span class="pdf-page-indicator" id="pdf-page-indicator-${post.row_number}" style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); background: var(--surface3); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0;">Loading...</span>
+                </div>
+                <a href="${mediaUrl}" target="_blank" class="btn-open-pdf" style="display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--signal); text-decoration: none; border: 1px solid var(--signal-dim); padding: 6px 10px; border-radius: 4px; background: var(--signal-dim); transition: all 0.2s; flex-shrink: 0;">
+                  <span>Open PDF</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                </a>
               </div>
             </div>
           `;
@@ -3752,38 +3864,41 @@
           
           mediaBox = `
             <!-- LinkedIn-Style High-Fidelity PDF Carousel Viewer (Page-by-Page Slider) -->
-            <div class="post-media-box pdf-viewer-container" style="background: #0f131a; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin: 12px 0 4px 0;">
-              <div class="pdf-viewer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--surface2); border-bottom: 1px solid var(--border2);">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">${fileName}</span>
-                  <span class="pdf-page-indicator" id="approved-pdf-page-indicator-${post.row_number}" style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); background: var(--surface3); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border);">Loading...</span>
-                </div>
-                <a href="${mediaUrl}" target="_blank" class="btn-open-pdf" style="display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--signal); text-decoration: none; border: 1px solid var(--signal-dim); padding: 4px 8px; border-radius: 4px; background: var(--signal-dim); transition: all 0.2s;">
-                  <span>Open PDF</span>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                </a>
-              </div>
+            <div class="pdf-viewer-container" style="display: flex; flex-direction: column; width: 100%; background: #0f131a; border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin: 12px 0 4px 0;">
               
-              <div class="pdf-canvas-container" style="position: relative; width: 100%; min-height: 380px; background: #0f131a; display: flex; align-items: center; justify-content: center; overflow: hidden; user-select: none;">
+              <!-- Slide Canvas Area -->
+              <div class="pdf-canvas-container" style="position: relative; width: 100%; min-height: 420px; background: #0b0f14; display: flex; align-items: center; justify-content: center; overflow: hidden; user-select: none;">
                 <!-- Loading spinner -->
-                <div class="pdf-loader" id="approved-pdf-loader-${post.row_number}" style="position: absolute; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--text-dim); font-size: 11px; font-family: var(--mono);">
-                  <div class="loader-spinner" style="width: 24px; height: 24px; border: 2px solid var(--border2); border-top-color: var(--signal); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <div class="pdf-loader" id="approved-pdf-loader-${post.row_number}" style="position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-dim); font-size: 11px; font-family: var(--mono); width: 100%; text-align: center; padding: 24px;">
+                  <div class="loader-spinner" style="width: 28px; height: 28px; border: 2px solid var(--border2); border-top-color: var(--signal); border-radius: 50%; animation: spin 1s linear infinite;"></div>
                   <span>Loading Slide Deck...</span>
                 </div>
                 
                 <!-- Left Navigation Arrow -->
-                <button class="pdf-nav-btn pdf-prev-btn" id="approved-pdf-prev-${post.row_number}" onclick="changePdfPage(${post.row_number}, -1, true)" style="position: absolute; left: 12px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(18, 23, 31, 0.85); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.2; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <button class="pdf-nav-btn pdf-prev-btn" id="approved-pdf-prev-${post.row_number}" onclick="changePdfPage(${post.row_number}, -1, true)" style="position: absolute; left: 16px; z-index: 10; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(11, 15, 20, 0.9); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.15; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.6);">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
                 </button>
                 
                 <!-- Canvas for Page Rendering -->
-                <canvas class="pdf-render-canvas" id="approved-pdf-canvas-${post.row_number}" style="max-width: 100%; max-height: 480px; display: block; object-fit: contain; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s;"></canvas>
+                <canvas class="pdf-render-canvas" id="approved-pdf-canvas-${post.row_number}" style="max-width: 100%; max-height: 520px; display: block; object-fit: contain; box-shadow: 0 4px 16px rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.3s;"></canvas>
                 
                 <!-- Right Navigation Arrow -->
-                <button class="pdf-nav-btn pdf-next-btn" id="approved-pdf-next-${post.row_number}" onclick="changePdfPage(${post.row_number}, 1, true)" style="position: absolute; right: 12px; z-index: 10; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(18, 23, 31, 0.85); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.2; pointer-events: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                <button class="pdf-nav-btn pdf-next-btn" id="approved-pdf-next-${post.row_number}" onclick="changePdfPage(${post.row_number}, 1, true)" style="position: absolute; right: 16px; z-index: 10; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border2); background: rgba(11, 15, 20, 0.9); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; backdrop-filter: blur(4px); opacity: 0.15; pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.6);">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </button>
+              </div>
+
+              <!-- Footer Details Bar at bottom -->
+              <div class="pdf-viewer-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--surface2); border-top: 1px solid var(--border2);">
+                <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 70%;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff5c5c" stroke-width="2" style="flex-shrink: 0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                  <span style="font-family: var(--sans); font-size: 12px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis;">${fileName}</span>
+                  <span class="pdf-page-indicator" id="approved-pdf-page-indicator-${post.row_number}" style="font-family: var(--mono); font-size: 10px; color: var(--text-dim); background: var(--surface3); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0;">Loading...</span>
+                </div>
+                <a href="${mediaUrl}" target="_blank" class="btn-open-pdf" style="display: flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10px; color: var(--signal); text-decoration: none; border: 1px solid var(--signal-dim); padding: 6px 10px; border-radius: 4px; background: var(--signal-dim); transition: all 0.2s; flex-shrink: 0;">
+                  <span>Open PDF</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                </a>
               </div>
             </div>
           `;
@@ -3885,9 +4000,24 @@
       const card = document.getElementById(`post-card-${rowNumber}`);
       let statusClass = status.toLowerCase();
       if (statusClass === 'redo requested') statusClass = 'redo_requested';
-      card.className = `post-card ${statusClass}`;
       
-      renderFeed();
+      if (card) {
+        card.className = `post-card ${statusClass}`;
+        
+        // Let the user see the status confirmation (glow + badge) for 1s, then trigger fade-out
+        setTimeout(() => {
+          card.classList.add('fade-out');
+          
+          // Wait for transition to complete, then remove from model and re-render feed
+          setTimeout(() => {
+            postsData = postsData.filter(p => p.row_number !== rowNumber);
+            renderFeed();
+          }, 400);
+        }, 1000);
+      } else {
+        postsData = postsData.filter(p => p.row_number !== rowNumber);
+        renderFeed();
+      }
 
       if (status === 'Approved') {
         showToast(`Syncing post row #${rowNumber} to approved channel...`, 'info');
